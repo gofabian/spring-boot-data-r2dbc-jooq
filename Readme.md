@@ -28,7 +28,7 @@ Add this library and a database driver (e. g. h2) to your `pom.xml`:
 <dependency>
     <groupId>de.gofabian</groupId>
     <artifactId>spring-boot-data-r2dbc-jooq</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.1</version>
 </dependency>
 <dependency>
     <groupId>io.r2dbc</groupId>
