@@ -10,7 +10,7 @@
 
     <groupId>de.gofabian</groupId>
     <artifactId>spring-boot-data-r2dbc-jooq</artifactId>
-    <version>0.1.1</version>
+    <version>0.1.2-SNAPSHOT</version>
 
     <name>spring-boot-data-r2dbc-jooq</name>
     <description>use jooq with spring-data-r2dbc</description>
@@ -33,7 +33,7 @@
         <connection>scm:git:git@github.com:gofabian/spring-boot-data-r2dbc-jooq.git</connection>
         <developerConnection>scm:git:git@github.com:gofabian/spring-boot-data-r2dbc-jooq.git</developerConnection>
         <url>http://github.com/gofabian/spring-boot-data-r2dbc-jooq/tree/master</url>
-        <tag>0.1.1</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <properties>
