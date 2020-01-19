@@ -26,10 +26,10 @@ public class R2dbcJooqAutoConfiguration {
             return SQLDialect.MYSQL;
         }
         if (r2dbcDialect instanceof H2Dialect) {
-            return SQLDialect.MYSQL;
+            return SQLDialect.H2;
         }
         if (r2dbcDialect instanceof PostgresDialect) {
-            return SQLDialect.MYSQL;
+            return SQLDialect.POSTGRES;
         }
         throw new IllegalArgumentException("unsupported r2dbc dialect " + r2dbcDialect.getClass());
     }
