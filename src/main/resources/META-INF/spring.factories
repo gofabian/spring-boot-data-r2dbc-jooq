@@ -1,0 +1,2 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+gofabian.r2dbc.jooq.R2dbcJooqAutoConfiguration
