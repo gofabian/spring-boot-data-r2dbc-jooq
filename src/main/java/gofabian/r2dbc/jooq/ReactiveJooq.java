@@ -15,6 +15,32 @@ import static org.jooq.impl.DSL.field;
 
 public class ReactiveJooq {
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static Mono<Integer> executeInsert(TableRecord<?> record) {
+        DSLContext dslContext = record.configuration().dsl();
+        InsertQuery insert = dslContext.insertQuery(record.getTable());
+        insert.setRecord(record);
+        return execute(insert);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public static Mono<Integer> executeUpdate(UpdatableRecord<?> record) {
+        DSLContext dslContext = record.configuration().dsl();
+        UpdateQuery update = dslContext.updateQuery(record.getTable());
+        Tools.addConditions(update, record, record.getTable().getPrimaryKey().getFieldsArray());
+        update.setRecord(record);
+        return execute(update);
+    }
+
+    @SuppressWarnings("rawtypes")
+    public static Mono<Integer> executeDelete(UpdatableRecord<?> record) {
+        DSLContext dslContext = record.configuration().dsl();
+        DeleteQuery delete = dslContext.deleteQuery(record.getTable());
+        Tools.addConditions(delete, record, record.getTable().getPrimaryKey().getFieldsArray());
+        return execute(delete);
+    }
+
+
     public static Mono<Integer> execute(Query jooqQuery) {
         return executeForR2dbcHandle(jooqQuery)
                 .fetch()

@@ -17,6 +17,11 @@ Mono<Boolean> monoExists = ReactiveJooq.fetchExists(selectQuery);
 
 var insertQuery = dslContext.insertInto(table("books"), field("name")).values("book");
 Mono<Integer> monoUpdateCount = ReactiveJooq.execute(insertQuery);
+
+var myRecord = dslContext.newRecord(MY_TABLE);
+Mono<Integer> monoInsertRecordCount = ReactiveJooq.executeInsert(myRecord);
+Mono<Integer> monoUpdateRecordCount = ReactiveJooq.executeUpdate(myRecord);
+Mono<Integer> monoDeleteRecordCount = ReactiveJooq.executeDelete(myRecord);
 ```
 
 
@@ -33,7 +38,7 @@ Add this library and a database driver (e. g. h2) to your `pom.xml`:
 <dependency>
     <groupId>io.r2dbc</groupId>
     <artifactId>r2dbc-h2</artifactId>
-    <version>0.8.0.RELEASE</version>
+    <version>0.8.3.RELEASE</version>
 </dependency>
 ```
 
@@ -50,10 +55,30 @@ If you do not use Spring Boot make sure that `R2dbcJooqAutoConfiguration` is det
 - Spring @Transactional annotation
 
 
+## Realization status
+
+| JOOQ | Reactive JOOQ |
+| --- | --- |
+| `query.execute()` -> `int` | `ReactiveJooq.execute(query)` -> `Mono<Integer>` |
+| `query.fetch()` -> `Result<R>` | `ReactiveJooq.fetch(query)` -> `Flux<Record>` |
+| `query.fetchOne()` -> `R` | `ReactiveJooq.fetchOne(query)` -> `Mono<Record>` |
+| `query.fetchAny()` -> `R` | `ReactiveJooq.fetchAny(query)` -> `Mono<Record>` |
+| `dslContext.fetchExists(query)` -> `boolean` | `ReactiveJooq.fetchExists(query)` -> `Mono<Boolean>` |
+| `dslContext.fetchCount(query)` -> `int` | `ReactiveJooq.fetchCount(query)` -> `Mono<Integer>` |
+| `record.insert()` -> `int` | `ReactiveJooq.executeInsert(record)` -> `Mono<Integer>` |
+| `record.update()` -> `int` | `ReactiveJooq.executeUpdate(record)` -> `Mono<Integer>` |
+| `record.delete()` -> `int` | `ReactiveJooq.executeDelete(record)` -> `Mono<Integer>` |
+| `record.store()` -> `int` | ? |
+| `record.refresh()` | ? |
+
+
 ## Restrictions
 
 The auto-configured DSLContext does not have a JDBC connection. It is only intended to generate SQL strings which is 
 given to the R2DBC database client for execution.
+
+Do not use JOOQ methods that require a JDBC connection (every method that calls the database)! Use the `ReactiveJooq` 
+methods instead.
 
 Incomplete list of methods that will not work:
 
