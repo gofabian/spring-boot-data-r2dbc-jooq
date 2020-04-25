@@ -47,19 +47,19 @@ public class ReactiveJooq {
                 .rowsUpdated();
     }
 
-    public static Flux<Record> fetch(Select<?> jooqQuery) {
+    public static <R extends Record> Flux<R> fetch(Select<R> jooqQuery) {
         return executeForR2dbcHandle(jooqQuery)
                 .map((row, metadata) -> convertRowToRecord(row, metadata, jooqQuery))
                 .all();
     }
 
-    public static Mono<Record> fetchOne(Select<?> jooqQuery) {
+    public static <R extends Record> Mono<R> fetchOne(Select<R> jooqQuery) {
         return executeForR2dbcHandle(jooqQuery)
                 .map((row, metadata) -> convertRowToRecord(row, metadata, jooqQuery))
                 .one();
     }
 
-    public static Mono<Record> fetchAny(Select<?> jooqQuery) {
+    public static <R extends Record> Mono<R> fetchAny(Select<R> jooqQuery) {
         return executeForR2dbcHandle(jooqQuery)
                 .map((row, metadata) -> convertRowToRecord(row, metadata, jooqQuery))
                 .first();
@@ -93,7 +93,7 @@ public class ReactiveJooq {
         return executeSpec;
     }
 
-    private static Record convertRowToRecord(Row row, RowMetadata metadata, Select<?> jooqQuery) {
+    private static <R extends Record> R convertRowToRecord(Row row, RowMetadata metadata, Select<R> jooqQuery) {
         List<Field<?>> fields = jooqQuery.getSelect();
         if (fields.isEmpty()) {
             metadata.getColumnMetadatas().forEach(m -> {
@@ -101,6 +101,7 @@ public class ReactiveJooq {
                 fields.add(field);
             });
         }
+
         Object[] values = new Object[fields.size()];
         for (int i = 0; i < fields.size(); i++) {
             values[i] = row.get(i);
@@ -109,7 +110,9 @@ public class ReactiveJooq {
         DSLContext dslContext = jooqQuery.configuration().dsl();
         Record record = dslContext.newRecord(fields);
         record.fromArray(values);
-        return record;
+        record.changed(false);
+
+        return record.into(jooqQuery.getRecordType());
     }
 
 }

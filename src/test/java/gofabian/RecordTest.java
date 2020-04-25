@@ -6,6 +6,8 @@ import gofabian.db.BookTable;
 import gofabian.r2dbc.jooq.ReactiveJooq;
 import org.jooq.DSLContext;
 import org.jooq.Record;
+import org.jooq.Record2;
+import org.jooq.Select;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,8 +17,7 @@ import org.springframework.data.r2dbc.core.DatabaseClient;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 class RecordTest {
@@ -73,9 +74,29 @@ class RecordTest {
         Integer deleteCount = ReactiveJooq.executeDelete(record).block();
         assertEquals(1, deleteCount);
 
-        List<Record> fetchedRecords = ReactiveJooq.fetch(dslContext.selectFrom(BookTable.BOOK_TABLE)).collectList().block();
+        List<?> fetchedRecords = ReactiveJooq.fetch(dslContext.selectFrom(BookTable.BOOK_TABLE)).collectList().block();
         assertNotNull(fetchedRecords);
         assertEquals(0, fetchedRecords.size());
+    }
+
+    @Test
+    void genericRecordResult() {
+        {
+            BookRecord preparedRecord = dslContext.newRecord(BookTable.BOOK_TABLE).values(1337L, "Olymp");
+            ReactiveJooq.executeInsert(preparedRecord).block();
+        }
+        {
+            Select<? extends Record> select = dslContext.selectFrom(BookTable.BOOK_TABLE);
+            Record record = ReactiveJooq.fetchOne(select).block();
+            assertTrue(record instanceof BookRecord);
+        }
+        {
+            Select<? extends Record> select = dslContext
+                    .select(BookTable.BOOK_TABLE.ID, BookTable.BOOK_TABLE.NAME)
+                    .from(BookTable.BOOK_TABLE);
+            Record record = ReactiveJooq.fetchOne(select).block();
+            assertTrue(record instanceof Record2);
+        }
     }
 
 }

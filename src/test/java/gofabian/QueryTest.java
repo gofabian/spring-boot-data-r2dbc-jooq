@@ -60,7 +60,7 @@ class QueryTest {
         Select<?> query = dslContext
                 .select(field("id"), field("name"))
                 .from(table("tab"));
-        List<Record> records = ReactiveJooq.fetch(query).collectList().block();
+        List<? extends Record> records = ReactiveJooq.fetch(query).collectList().block();
         assertNotNull(records);
         assertEquals(1, records.size());
         assertEquals("fab", records.get(0).get("name", String.class));
