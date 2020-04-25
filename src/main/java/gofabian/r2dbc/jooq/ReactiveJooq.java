@@ -1,7 +1,6 @@
 package gofabian.r2dbc.jooq;
 
 import io.r2dbc.spi.Row;
-import io.r2dbc.spi.RowMetadata;
 import org.jooq.*;
 import org.jooq.conf.ParamType;
 import org.springframework.data.r2dbc.core.DatabaseClient;
@@ -10,8 +9,6 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Objects;
-
-import static org.jooq.impl.DSL.field;
 
 public class ReactiveJooq {
 
@@ -49,19 +46,19 @@ public class ReactiveJooq {
 
     public static <R extends Record> Flux<R> fetch(Select<R> jooqQuery) {
         return executeForR2dbcHandle(jooqQuery)
-                .map((row, metadata) -> convertRowToRecord(row, metadata, jooqQuery))
+                .map(row -> convertRowToRecord(row, jooqQuery))
                 .all();
     }
 
     public static <R extends Record> Mono<R> fetchOne(Select<R> jooqQuery) {
         return executeForR2dbcHandle(jooqQuery)
-                .map((row, metadata) -> convertRowToRecord(row, metadata, jooqQuery))
+                .map(row -> convertRowToRecord(row, jooqQuery))
                 .one();
     }
 
     public static <R extends Record> Mono<R> fetchAny(Select<R> jooqQuery) {
         return executeForR2dbcHandle(jooqQuery)
-                .map((row, metadata) -> convertRowToRecord(row, metadata, jooqQuery))
+                .map(row -> convertRowToRecord(row, jooqQuery))
                 .first();
     }
 
@@ -93,14 +90,8 @@ public class ReactiveJooq {
         return executeSpec;
     }
 
-    private static <R extends Record> R convertRowToRecord(Row row, RowMetadata metadata, Select<R> jooqQuery) {
+    private static <R extends Record> R convertRowToRecord(Row row, Select<R> jooqQuery) {
         List<Field<?>> fields = jooqQuery.getSelect();
-        if (fields.isEmpty()) {
-            metadata.getColumnMetadatas().forEach(m -> {
-                Field<?> field = field(m.getName(), m.getJavaType());
-                fields.add(field);
-            });
-        }
 
         Object[] values = new Object[fields.size()];
         for (int i = 0; i < fields.size(); i++) {
