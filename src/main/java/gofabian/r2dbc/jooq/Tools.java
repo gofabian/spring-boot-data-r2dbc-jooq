@@ -6,6 +6,9 @@ import org.jooq.impl.DefaultConfiguration;
 
 import static org.jooq.conf.SettingsTools.updatablePrimaryKeys;
 
+/**
+ * Subset of internal JOOQ class org.jooq.impl.Tools
+ */
 class Tools {
 
     /**
