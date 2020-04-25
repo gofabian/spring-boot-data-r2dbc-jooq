@@ -8,16 +8,23 @@ This library integrates JOOQ into Spring Data R2DBC.
 Usage:
 
 ```java
-var selectQuery = dslContext.selectFrom(table("book"));
-Flux<Record> flux = ReactiveJooq.fetch(selectQuery);
-Mono<Record> monoOne = ReactiveJooq.fetchOne(selectQuery);
-Mono<Record> monoAny = ReactiveJooq.fetchAny(selectQuery);
+// fetch queries
+var selectQuery = dslContext.selectCount().from(BOOK_TABLE);
+Flux<Record1<Integer>> flux = ReactiveJooq.fetch(selectQuery);
+Mono<Record1<Integer>> monoOne = ReactiveJooq.fetchOne(selectQuery);
+Mono<Record1<Integer>> monoAny = ReactiveJooq.fetchAny(selectQuery);
 Mono<Integer> monoCount = ReactiveJooq.fetchCount(selectQuery);
 Mono<Boolean> monoExists = ReactiveJooq.fetchExists(selectQuery);
 
+// fetch queries with generated JOOQ tables
+var tableQuery = dslContext.selectFrom(BOOK_TABLE);
+Flux<BookRecord> flux = ReactiveJooq.fetch(selectQuery);
+
+// manipulating queries
 var insertQuery = dslContext.insertInto(table("books"), field("name")).values("book");
 Mono<Integer> monoUpdateCount = ReactiveJooq.execute(insertQuery);
 
+// record manipulation
 var myRecord = dslContext.newRecord(MY_TABLE);
 Mono<Integer> monoInsertRecordCount = ReactiveJooq.executeInsert(myRecord);
 Mono<Integer> monoUpdateRecordCount = ReactiveJooq.executeUpdate(myRecord);
@@ -60,9 +67,9 @@ If you do not use Spring Boot make sure that `R2dbcJooqAutoConfiguration` is det
 | JOOQ | Reactive JOOQ |
 | --- | --- |
 | `query.execute()` -> `int` | `ReactiveJooq.execute(query)` -> `Mono<Integer>` |
-| `query.fetch()` -> `Result<R>` | `ReactiveJooq.fetch(query)` -> `Flux<Record>` |
-| `query.fetchOne()` -> `R` | `ReactiveJooq.fetchOne(query)` -> `Mono<Record>` |
-| `query.fetchAny()` -> `R` | `ReactiveJooq.fetchAny(query)` -> `Mono<Record>` |
+| `query.fetch()` -> `Result<R>` | `ReactiveJooq.fetch(query)` -> `Flux<R>` |
+| `query.fetchOne()` -> `R` | `ReactiveJooq.fetchOne(query)` -> `Mono<R>` |
+| `query.fetchAny()` -> `R` | `ReactiveJooq.fetchAny(query)` -> `Mono<R>` |
 | `dslContext.fetchExists(query)` -> `boolean` | `ReactiveJooq.fetchExists(query)` -> `Mono<Boolean>` |
 | `dslContext.fetchCount(query)` -> `int` | `ReactiveJooq.fetchCount(query)` -> `Mono<Integer>` |
 | `record.insert()` -> `int` | `ReactiveJooq.executeInsert(record)` -> `Mono<Integer>` |
