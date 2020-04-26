@@ -74,7 +74,7 @@ If you do not use Spring Boot make sure that `R2dbcJooqAutoConfiguration` is det
 | `dslContext.fetchCount(query)` -> `int` | `ReactiveJooq.fetchCount(query)` -> `Mono<Integer>` |
 | `record.insert()` -> `int` | `ReactiveJooq.insert(record)` -> `Mono<Integer>` |
 | `record.update()` -> `int` | `ReactiveJooq.update(record)` -> `Mono<Integer>` |
-| `record.delete()` -> `int` | `ReactiveJooq.executeDelete(record)` -> `Mono<Integer>` |
+| `record.delete()` -> `int` | `ReactiveJooq.delete(record)` -> `Mono<Integer>` |
 | `record.store()` -> `int` | ? |
 | `record.refresh()` | ? |
 
@@ -102,6 +102,7 @@ Further unsupported features of records:
 
 - Updatable primary keys
 - Optimistic locking
+- Record listeners
 
 
 ## License

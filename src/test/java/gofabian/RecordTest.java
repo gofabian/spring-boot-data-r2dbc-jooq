@@ -72,7 +72,7 @@ class RecordTest {
         BookRecord record = dslContext.newRecord(BookTable.BOOK_TABLE).values(1337L, "Olymp");
         ReactiveJooq.insert(record).block();
 
-        Integer deleteCount = ReactiveJooq.executeDelete(record).block();
+        Integer deleteCount = ReactiveJooq.delete(record).block();
         assertEquals(1, deleteCount);
 
         List<?> fetchedRecords = ReactiveJooq.fetch(dslContext.selectFrom(BookTable.BOOK_TABLE)).collectList().block();
@@ -171,6 +171,16 @@ class RecordTest {
         assertTrue(bookRecord.changed());
         ReactiveJooq.update(bookRecord).block();
         assertFalse(bookRecord.changed());
+    }
+
+    @Test
+    void changedAfterDeletion() {
+        BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).values(19L, "book name");
+        ReactiveJooq.insert(bookRecord).block();
+
+        assertFalse(bookRecord.changed());
+        ReactiveJooq.delete(bookRecord).block();
+        assertTrue(bookRecord.changed());
     }
 
 }

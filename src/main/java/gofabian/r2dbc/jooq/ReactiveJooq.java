@@ -218,12 +218,20 @@ public class ReactiveJooq {
         targetRecord.setValue(field, value);
     }
 
-    @SuppressWarnings("rawtypes")
-    public static Mono<Integer> executeDelete(UpdatableRecord<?> record) {
+    public static <R extends UpdatableRecord<R>> Mono<Integer> delete(R record) {
         DSLContext dslContext = record.configuration().dsl();
-        DeleteQuery delete = dslContext.deleteQuery(record.getTable());
-        Tools.addConditions(delete, record, record.getTable().getPrimaryKey().getFieldsArray());
-        return execute(delete);
+        TableField<R, ?>[] keys = record.getTable().getPrimaryKey().getFieldsArray();
+
+        DeleteQuery<R> delete = dslContext.deleteQuery(record.getTable());
+        Tools.addConditions(delete, record, keys);
+
+        Mono<Integer> monoResult = execute(delete);
+
+        return monoResult.doFinally(result -> {
+            // [#673] [#3363] If store() is called after delete(), a new INSERT should
+            // be executed and the record should be recreated
+            record.changed(true);
+        });
     }
 
 
