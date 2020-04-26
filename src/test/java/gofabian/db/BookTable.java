@@ -16,7 +16,7 @@ public class BookTable extends TableImpl<BookRecord> {
 
     public static final UniqueKey<BookRecord> ID_PKEY = Internal.createUniqueKey(BOOK_TABLE, "id_pkey", BOOK_TABLE.ID);
 
-    public final TableField<BookRecord, Long> ID = createField(DSL.name("id"), SQLDataType.BIGINT, this, "");
+    public final TableField<BookRecord, Long> ID = createField(DSL.name("id"), SQLDataType.BIGINT.nullable(false), this, "");
     public final TableField<BookRecord, String> NAME = createField(DSL.name("name"), SQLDataType.VARCHAR, this, "");
 
     public BookTable() {

@@ -42,7 +42,7 @@ class RecordTest {
     @Test
     void insertRecord() {
         BookRecord record = dslContext.newRecord(BookTable.BOOK_TABLE).values(42L, "Java Basics");
-        Integer insertCount = ReactiveJooq.executeInsert(record).block();
+        Integer insertCount = ReactiveJooq.insert(record).block();
         assertEquals(1, insertCount);
 
         Record fetchedRecord = ReactiveJooq.fetchOne(dslContext.selectFrom(BookTable.BOOK_TABLE)).block();
@@ -53,10 +53,10 @@ class RecordTest {
     @Test
     void updateRecord() {
         BookRecord record = dslContext.newRecord(BookTable.BOOK_TABLE).values(42L, "Java Basics");
-        ReactiveJooq.executeInsert(record).block();
+        ReactiveJooq.insert(record).block();
 
         record.value2("C++ Basics");
-        Integer updateCount = ReactiveJooq.executeUpdate(record).block();
+        Integer updateCount = ReactiveJooq.update(record).block();
         assertEquals(1, updateCount);
 
         Record fetchedRecord = ReactiveJooq.fetchOne(dslContext.selectFrom(BookTable.BOOK_TABLE)).block();
@@ -69,7 +69,7 @@ class RecordTest {
     @Test
     void deleteRecord() {
         BookRecord record = dslContext.newRecord(BookTable.BOOK_TABLE).values(1337L, "Olymp");
-        ReactiveJooq.executeInsert(record).block();
+        ReactiveJooq.insert(record).block();
 
         Integer deleteCount = ReactiveJooq.executeDelete(record).block();
         assertEquals(1, deleteCount);
@@ -83,7 +83,7 @@ class RecordTest {
     void genericRecordResult() {
         {
             BookRecord preparedRecord = dslContext.newRecord(BookTable.BOOK_TABLE).values(1337L, "Olymp");
-            ReactiveJooq.executeInsert(preparedRecord).block();
+            ReactiveJooq.insert(preparedRecord).block();
         }
         {
             Select<? extends Record> select = dslContext.selectFrom(BookTable.BOOK_TABLE);
@@ -97,6 +97,19 @@ class RecordTest {
             Record record = ReactiveJooq.fetchOne(select).block();
             assertTrue(record instanceof Record2);
         }
+    }
+
+    @Test
+    void unchangedAfterExecution() {
+        BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).values(19L, "book name");
+        assertTrue(bookRecord.changed());
+        ReactiveJooq.insert(bookRecord).block();
+        assertFalse(bookRecord.changed());
+
+        bookRecord.value2("another book name");
+        assertTrue(bookRecord.changed());
+        ReactiveJooq.update(bookRecord).block();
+        assertFalse(bookRecord.changed());
     }
 
 }

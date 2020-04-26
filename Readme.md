@@ -72,8 +72,8 @@ If you do not use Spring Boot make sure that `R2dbcJooqAutoConfiguration` is det
 | `query.fetchAny()` -> `R` | `ReactiveJooq.fetchAny(query)` -> `Mono<R>` |
 | `dslContext.fetchExists(query)` -> `boolean` | `ReactiveJooq.fetchExists(query)` -> `Mono<Boolean>` |
 | `dslContext.fetchCount(query)` -> `int` | `ReactiveJooq.fetchCount(query)` -> `Mono<Integer>` |
-| `record.insert()` -> `int` | `ReactiveJooq.executeInsert(record)` -> `Mono<Integer>` |
-| `record.update()` -> `int` | `ReactiveJooq.executeUpdate(record)` -> `Mono<Integer>` |
+| `record.insert()` -> `int` | `ReactiveJooq.insert(record)` -> `Mono<Integer>` |
+| `record.update()` -> `int` | `ReactiveJooq.update(record)` -> `Mono<Integer>` |
 | `record.delete()` -> `int` | `ReactiveJooq.executeDelete(record)` -> `Mono<Integer>` |
 | `record.store()` -> `int` | ? |
 | `record.refresh()` | ? |
@@ -97,6 +97,11 @@ Incomplete list of methods that will not work:
 - `Record.update()`
 - `Record.refresh()`
 - `Record.delete()`
+
+Further unsupported features of records:
+
+- Updatable primary keys
+- Optimistic locking
 
 
 ## License
