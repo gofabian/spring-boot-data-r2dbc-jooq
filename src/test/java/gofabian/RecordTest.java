@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.r2dbc.core.DatabaseClient;
 
+import java.util.Comparator;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -97,6 +98,66 @@ class RecordTest {
             Record record = ReactiveJooq.fetchOne(select).block();
             assertTrue(record instanceof Record2);
         }
+    }
+
+    @Test
+    void storeAsInsert() {
+        // when: store new record
+        BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).values(19L, "book name");
+        {
+            Integer insertResult = ReactiveJooq.store(bookRecord).block();
+            assertNotNull(insertResult);
+            assertEquals(1L, insertResult.intValue());
+        }
+
+        // then: inserted
+        {
+            Select<? extends Record> select = dslContext.selectFrom(BookTable.BOOK_TABLE);
+            Record record = ReactiveJooq.fetchOne(select).block();
+            assertNotNull(record);
+            assertEquals(19L, record.get(0, Long.class));
+            assertEquals("book name", record.get(1, String.class));
+        }
+
+        // when: store record with updated primary key
+        {
+            bookRecord.value1(20L);
+            Integer insertResult = ReactiveJooq.store(bookRecord).block();
+            assertNotNull(insertResult);
+            assertEquals(1L, insertResult.intValue());
+        }
+
+        // then: inserted second record
+        {
+            Select<? extends Record> select = dslContext.selectFrom(BookTable.BOOK_TABLE);
+            List<? extends Record> records = ReactiveJooq.fetch(select).collectList().block();
+            assertNotNull(records);
+            records.sort(Comparator.comparing(r -> r.get(0, Long.class)));
+            assertEquals(19L, records.get(0).get(0, Long.class));
+            assertEquals("book name", records.get(0).get(1, String.class));
+            assertEquals(20L, records.get(1).get(0, Long.class));
+            assertEquals("book name", records.get(1).get(1, String.class));
+        }
+    }
+
+    @Test
+    void storeAsUpdate() {
+        // when: store new record
+        BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).values(19L, "book name");
+        ReactiveJooq.store(bookRecord).block();
+
+        // when: store updated record
+        bookRecord.value2("book name changed");
+        Integer updateResult = ReactiveJooq.store(bookRecord).block();
+        assertNotNull(updateResult);
+        assertEquals(1L, updateResult.intValue());
+
+        // then: updated
+        Select<? extends Record> select = dslContext.selectFrom(BookTable.BOOK_TABLE);
+        Record record = ReactiveJooq.fetchOne(select).block();
+        assertNotNull(record);
+        assertEquals(19L, record.get(0, Long.class));
+        assertEquals("book name changed", record.get(1, String.class));
     }
 
     @Test

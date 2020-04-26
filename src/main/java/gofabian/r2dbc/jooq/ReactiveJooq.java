@@ -29,6 +29,31 @@ public class ReactiveJooq {
 
     private static final EnumSet<SQLDialect> REFRESH_GENERATED_KEYS = EnumSet.of(DERBY, H2, MARIADB, MYSQL);
 
+    public static <R extends UpdatableRecord<R>> Mono<Integer> store(R record) {
+        TableField<R, ?>[] keys = record.getTable().getPrimaryKey().getFieldsArray();
+        boolean executeUpdate = false;
+
+        for (TableField<R, ?> field : keys) {
+
+            // If any primary key value is null or changed
+            if (record.changed(field) ||
+
+                    // [#3237] or if a NOT NULL primary key value is null, then execute an INSERT
+                    (!field.getDataType().nullable() && record.get(field) == null)) {
+                executeUpdate = false;
+                break;
+            }
+
+            // Otherwise, updates are possible
+            executeUpdate = true;
+        }
+
+        if (executeUpdate) {
+            return update(record);
+        } else {
+            return insert(record);
+        }
+    }
 
     public static <R extends TableRecord<R>> Mono<Integer> insert(R record) {
         DSLContext dslContext = record.configuration().dsl();
