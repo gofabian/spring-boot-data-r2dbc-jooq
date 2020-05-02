@@ -1,12 +1,11 @@
 package gofabian.db;
 
-import org.jooq.Field;
-import org.jooq.Record1;
-import org.jooq.Record2;
-import org.jooq.Row2;
+import org.jooq.*;
 import org.jooq.impl.UpdatableRecordImpl;
 
-public class BookRecord extends UpdatableRecordImpl<BookRecord> implements Record2<Long, String> {
+import java.time.LocalDateTime;
+
+public class BookRecord extends UpdatableRecordImpl<BookRecord> implements Record3<Long, String, LocalDateTime> {
 
     public BookRecord() {
         super(BookTable.BOOK_TABLE);
@@ -23,6 +22,11 @@ public class BookRecord extends UpdatableRecordImpl<BookRecord> implements Recor
     }
 
     @Override
+    public Field<LocalDateTime> field3() {
+        return BookTable.BOOK_TABLE.TIMESTAMP;
+    }
+
+    @Override
     public Long value1() {
         return (Long) get(0);
     }
@@ -30,6 +34,11 @@ public class BookRecord extends UpdatableRecordImpl<BookRecord> implements Recor
     @Override
     public String value2() {
         return (String) get(1);
+    }
+
+    @Override
+    public LocalDateTime value3() {
+        return (LocalDateTime) get(2);
     }
 
     @Override
@@ -45,9 +54,16 @@ public class BookRecord extends UpdatableRecordImpl<BookRecord> implements Recor
     }
 
     @Override
-    public BookRecord values(Long value1, String value2) {
+    public BookRecord value3(LocalDateTime value) {
+        set(2, value);
+        return this;
+    }
+
+    @Override
+    public BookRecord values(Long value1, String value2, LocalDateTime value3) {
         value1(value1);
         value2(value2);
+        value3(value3);
         return this;
     }
 
@@ -62,15 +78,20 @@ public class BookRecord extends UpdatableRecordImpl<BookRecord> implements Recor
     }
 
     @Override
-    public Row2<Long, String> fieldsRow() {
-        //noinspection unchecked
-        return (Row2<Long, String>) super.fieldsRow();
+    public LocalDateTime component3() {
+        return value3();
     }
 
     @Override
-    public Row2<Long, String> valuesRow() {
+    public Row3<Long, String, LocalDateTime> fieldsRow() {
         //noinspection unchecked
-        return (Row2<Long, String>) super.valuesRow();
+        return (Row3<Long, String, LocalDateTime>) super.fieldsRow();
+    }
+
+    @Override
+    public Row3<Long, String, LocalDateTime> valuesRow() {
+        //noinspection unchecked
+        return (Row3<Long, String, LocalDateTime>) super.valuesRow();
     }
 
     @Override

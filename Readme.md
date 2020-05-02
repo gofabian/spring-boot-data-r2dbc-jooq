@@ -26,9 +26,9 @@ Mono<Integer> monoUpdateCount = ReactiveJooq.execute(insertQuery);
 
 // record manipulation
 var myRecord = dslContext.newRecord(MY_TABLE);
-Mono<Integer> monoInsertRecordCount = ReactiveJooq.executeInsert(myRecord);
-Mono<Integer> monoUpdateRecordCount = ReactiveJooq.executeUpdate(myRecord);
-Mono<Integer> monoDeleteRecordCount = ReactiveJooq.executeDelete(myRecord);
+Mono<Integer> monoInsertRecordCount = ReactiveJooq.insert(myRecord);
+Mono<Integer> monoUpdateRecordCount = ReactiveJooq.update(myRecord);
+Mono<Integer> monoDeleteRecordCount = ReactiveJooq.delete(myRecord);
 ```
 
 
@@ -57,6 +57,7 @@ If you do not use Spring Boot make sure that `R2dbcJooqAutoConfiguration` is det
 
 ## Support
 
+- Spring Boot 2.3.0.M4
 - H2, MySQL, Postgresql
 - Java 8+
 - Spring @Transactional annotation
@@ -98,12 +99,21 @@ Incomplete list of methods that will not work:
 - `Record.refresh()`
 - `Record.delete()`
 
-Further unsupported features of records:
+Further unsupported features:
 
-- Updatable primary keys
-- Optimistic locking
-- Record listeners
-
+- `RecordListener`
+- `ExecuteListener`
+- `TransactionListener`
+- `settings.setExecuteWithOptimisticLocking(true)`
+- `settings.setExecuteWithOptimisticLockingExcludeUnversioned(true)`
+- `settings.setUpdateRecordVersion(true)`
+- `settings.setUpdateRecordTimestamp(true)`
+- `settings.setUpdatablePrimaryKeys(true)`
+- `settings.setQueryPoolable(...)`
+- `settings.setQueryTimeout(...)`
+- `settings.setMaxRows(...)`
+- `settings.setFetchSize(...)`
+- ...
 
 ## License
 

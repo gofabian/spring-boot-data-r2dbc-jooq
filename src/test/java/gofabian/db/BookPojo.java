@@ -1,11 +1,13 @@
 package gofabian.db;
 
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 public class BookPojo {
 
     private Long id;
     private String name;
+    private LocalDateTime timestamp;
 
     public BookPojo() {
     }
@@ -31,11 +33,20 @@ public class BookPojo {
         this.name = name;
     }
 
+    public LocalDateTime getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(LocalDateTime timestamp) {
+        this.timestamp = timestamp;
+    }
+
     @Override
     public String toString() {
         return "BookPojo{" +
                 "id=" + id +
                 ", name='" + name + '\'' +
+                ", timestamp=" + timestamp +
                 '}';
     }
 

@@ -1,9 +1,12 @@
 package gofabian.r2dbc.jooq;
 
 import io.r2dbc.spi.Row;
+import io.r2dbc.spi.RowMetadata;
 import org.jooq.*;
 import org.jooq.conf.ParamType;
 import org.jooq.conf.Settings;
+import org.jooq.exception.NoDataFoundException;
+import org.jooq.tools.JooqLogger;
 import org.springframework.data.r2dbc.core.DatabaseClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -12,8 +15,6 @@ import java.util.*;
 
 import static java.lang.Boolean.FALSE;
 import static java.lang.Boolean.TRUE;
-import static org.jooq.SQLDialect.*;
-import static org.jooq.conf.SettingsTools.updatablePrimaryKeys;
 
 
 /**
@@ -27,7 +28,9 @@ import static org.jooq.conf.SettingsTools.updatablePrimaryKeys;
  */
 public class ReactiveJooq {
 
-    private static final EnumSet<SQLDialect> REFRESH_GENERATED_KEYS = EnumSet.of(DERBY, H2, MARIADB, MYSQL);
+    private static final JooqLogger log = JooqLogger.getLogger(ReactiveJooq.class);
+
+    private static final EnumSet<SQLDialect> REFRESH_GENERATED_KEYS = EnumSet.of(SQLDialect.MYSQL);
 
     public static <R extends UpdatableRecord<R>> Mono<Integer> store(R record) {
         TableField<R, ?>[] keys = record.getTable().getPrimaryKey().getFieldsArray();
@@ -59,11 +62,25 @@ public class ReactiveJooq {
         DSLContext dslContext = record.configuration().dsl();
         InsertQuery<R> insert = dslContext.insertQuery(record.getTable());
         addChangedValues(record, insert);
+        return executeStore(record, insert);
 
+    }
+
+    public static <R extends UpdatableRecord<R>> Mono<Integer> update(R record) {
+        DSLContext dslContext = record.configuration().dsl();
+        UpdateQuery<R> update = dslContext.updateQuery(record.getTable());
+        addChangedValues(record, update);
+        Tools.addConditions(update, record, record.getTable().getPrimaryKey().getFieldsArray());
+        return executeStore(record, update);
+    }
+
+
+    private static <R extends TableRecord<R>> Mono<Integer> executeStore(R record, StoreQuery<R> insert) {
         // Don't store records if no value was set by client code
         if (!insert.isExecutable()) {
-//            if (log.isDebugEnabled())
-//                log.debug("Query is not executable", insert);
+            if (log.isDebugEnabled()) {
+                log.debug("Query is not executable", insert);
+            }
 
             return Mono.just(0);
         }
@@ -72,44 +89,35 @@ public class ReactiveJooq {
         // [#1002] Consider also identity columns of non-updatable records
         // [#1537] Avoid refreshing identity columns on batch inserts
         Collection<Field<?>> key = setReturningIfNeeded(record, insert);
-        Mono<Integer> monoResult = execute(insert);
 
-        return monoResult.doOnNext(result -> {
-            if (result > 0) {
-                record.changed(false);
+        Mono<Integer> monoResult;
 
-                // [#1859] If an insert was successful try fetching the generated values.
-                getReturningIfNeeded(record, insert, key);
-            }
-        });
-    }
-
-    public static <R extends UpdatableRecord<R>> Mono<Integer> update(R record) {
-        DSLContext dslContext = record.configuration().dsl();
-        UpdateQuery<R> update = dslContext.updateQuery(record.getTable());
-        addChangedValues(record, update);
-        Tools.addConditions(update, record, record.getTable().getPrimaryKey().getFieldsArray());
-
-        // Don't store records if no value was set by client code
-        if (!update.isExecutable()) {
-//            if (log.isDebugEnabled())
-//                log.debug("Query is not executable", update);
-
-            return Mono.just(0);
+        if (key == null || key.isEmpty()) {
+            monoResult = execute(insert);
+        } else {
+            monoResult = createR2dbcExecuteSpec(insert)
+                    .filter(s -> {
+                        if (record.configuration().family() == SQLDialect.MYSQL) {
+                            return s.returnGeneratedValues();
+                        } else {
+                            String[] keyNames = key.stream().map(Field::getName).toArray(String[]::new);
+                            return s.returnGeneratedValues(keyNames);
+                        }
+                    })
+                    .map((row, metadata) -> convertRowToRecord(row, metadata, record))
+                    .one()
+                    .flatMap(returnedRecord -> {
+                        // [#1859] If an insert was successful try fetching the generated values.
+                        Mono<Void> monoRefresh = getReturningIfNeeded(returnedRecord, record, key);
+                        return monoRefresh.thenReturn(record);
+                    })
+                    .hasElement()
+                    .map(hasElement -> hasElement ? 1 : 0);
         }
 
-        // [#1596] Check if the record was really changed in the database
-        // [#1859] Specify the returning clause if needed
-        Collection<Field<?>> key = setReturningIfNeeded(record, update);
-
-        Mono<Integer> monoResult = execute(update);
-
         return monoResult.doOnNext(result -> {
             if (result > 0) {
                 record.changed(false);
-
-                // [#1859] If an update was successful try fetching the generated
-                getReturningIfNeeded(record, update, key);
             }
         });
     }
@@ -142,7 +150,9 @@ public class ReactiveJooq {
 
             // [#7966] Allow users to turning off the returning clause entirely
             if (!FALSE.equals(settings.isReturnIdentityOnUpdatableRecord())
-                    && !TRUE.equals(data(configuration, "DATA_OMIT_RETURNING_CLAUSE"))) {
+                // todo: for batch queries?
+//                    && !TRUE.equals(data(configuration, "DATA_OMIT_RETURNING_CLAUSE"))
+            ) {
 
                 // [#1859] Return also non-key columns
                 if (TRUE.equals(settings.isReturnAllOnUpdatableRecord())) {
@@ -150,7 +160,7 @@ public class ReactiveJooq {
                 }
 
                 // [#5940] Getting the primary key mostly doesn't make sense on UPDATE statements
-                else if (query instanceof InsertQuery || updatablePrimaryKeys(Tools.settings(record))) {
+                else if (query instanceof InsertQuery) {
                     key = getReturning(record);
                 }
             }
@@ -163,6 +173,7 @@ public class ReactiveJooq {
         return key;
     }
 
+    // todo: this is not very efficient
     @SuppressWarnings("SameParameterValue")
     private static Object data(Configuration configuration, String keyString) {
         for (Object key : configuration.data().keySet()) {
@@ -189,9 +200,8 @@ public class ReactiveJooq {
         return result;
     }
 
-    private static <R extends TableRecord<R>> void getReturningIfNeeded(R record, StoreQuery<R> query, Collection<Field<?>> key) {
+    private static <R extends TableRecord<R>, T extends UpdatableRecord<T>> Mono<Void> getReturningIfNeeded(Record returnedRecord, R record, Collection<Field<?>> key) {
         if (key != null && !key.isEmpty()) {
-            R returnedRecord = query.getReturnedRecord();
 
             if (returnedRecord != null) {
                 for (Field<?> field : key) {
@@ -205,15 +215,19 @@ public class ReactiveJooq {
                     && REFRESH_GENERATED_KEYS.contains(record.configuration().family())
                     && record instanceof UpdatableRecord) {
                 // todo: refresh
+                //noinspection unchecked
+//                return refresh((T) record, key.toArray(new Field<?>[0]));
 //                ((UpdatableRecord<?>) record).refresh(key.toArray(new Field<?>[0]));
             }
         }
+
+        return Mono.empty();
     }
 
     /**
      * Extracted method to ensure generic type safety.
      */
-    private static <T, R extends TableRecord<R>> void setValue(R sourceRecord, R targetRecord, Field<T> field) {
+    private static <T, R extends TableRecord<R>> void setValue(Record sourceRecord, R targetRecord, Field<T> field) {
         T value = sourceRecord.get(field);
         targetRecord.setValue(field, value);
     }
@@ -236,26 +250,26 @@ public class ReactiveJooq {
 
 
     public static Mono<Integer> execute(Query jooqQuery) {
-        return executeForR2dbcHandle(jooqQuery)
+        return createR2dbcExecuteSpec(jooqQuery)
                 .fetch()
                 .rowsUpdated();
     }
 
     public static <R extends Record> Flux<R> fetch(Select<R> jooqQuery) {
-        return executeForR2dbcHandle(jooqQuery)
-                .map(row -> convertRowToRecord(row, jooqQuery))
+        return createR2dbcExecuteSpec(jooqQuery)
+                .map(row -> convertRowToGenericRecord(row, jooqQuery))
                 .all();
     }
 
     public static <R extends Record> Mono<R> fetchOne(Select<R> jooqQuery) {
-        return executeForR2dbcHandle(jooqQuery)
-                .map(row -> convertRowToRecord(row, jooqQuery))
+        return createR2dbcExecuteSpec(jooqQuery)
+                .map(row -> convertRowToGenericRecord(row, jooqQuery))
                 .one();
     }
 
     public static <R extends Record> Mono<R> fetchAny(Select<R> jooqQuery) {
-        return executeForR2dbcHandle(jooqQuery)
-                .map(row -> convertRowToRecord(row, jooqQuery))
+        return createR2dbcExecuteSpec(jooqQuery)
+                .map(row -> convertRowToGenericRecord(row, jooqQuery))
                 .first();
     }
 
@@ -278,14 +292,19 @@ public class ReactiveJooq {
     /**
      * Execute JOOQ query via R2DBC database client.
      */
-    private static DatabaseClient.GenericExecuteSpec executeForR2dbcHandle(Query jooqQuery) {
+    private static DatabaseClient.GenericExecuteSpec createR2dbcExecuteSpec(Query jooqQuery) {
         DatabaseClient databaseClient = (DatabaseClient) jooqQuery.configuration().data("databaseClient");
         String sql = jooqQuery.getSQL(ParamType.NAMED);
         DatabaseClient.GenericExecuteSpec executeSpec = databaseClient.execute(sql);
         List<Object> bindValues = jooqQuery.getBindValues();
         for (int i = 0; i < bindValues.size(); i++) {
             Object value = bindValues.get(i);
-            executeSpec = executeSpec.bind(i, value);
+            if (value == null) {
+                // with the random type (Boolean) we select an R2DBC codec that can encode null
+                executeSpec = executeSpec.bindNull(i, Boolean.class);
+            } else {
+                executeSpec = executeSpec.bind(i, value);
+            }
         }
         return executeSpec;
     }
@@ -293,14 +312,14 @@ public class ReactiveJooq {
     /**
      * Convert result from R2DBC database client into JOOQ record.
      */
-    private static <R extends Record> R convertRowToRecord(Row row, Select<R> jooqQuery) {
+    private static <R extends Record> R convertRowToGenericRecord(Row row, Select<R> jooqQuery) {
         // get selected fields
         List<Field<?>> fields = jooqQuery.getSelect();
 
         // collect values in fields order
         Object[] values = new Object[fields.size()];
         for (int i = 0; i < fields.size(); i++) {
-            values[i] = row.get(i);
+            values[i] = row.get(i, fields.get(i).getType());
         }
 
         // create intermediate record
@@ -311,6 +330,37 @@ public class ReactiveJooq {
 
         // convert to expected record type
         return record.into(jooqQuery.getRecordType());
+    }
+
+    private static <R extends TableRecord<R>> Record convertRowToRecord(Row row, RowMetadata metadata, R tableRecord) {
+        DSLContext dslContext = tableRecord.configuration().dsl();
+        Table<R> table = tableRecord.getTable();
+
+        // collect table fields by name
+        List<Field<?>> fields = new ArrayList<>();
+        metadata.getColumnMetadatas().forEach(column -> {
+            for (Field<?> tableField : table.fields()) {
+                if (tableField.getName().equals(column.getName())) {
+                    fields.add(tableField);
+                    return;
+                }
+            }
+            throw new IllegalArgumentException("Table '" + table.getName() + "' does not contain field '"
+                    + column.getName() + "'");
+        });
+
+        // collect values in fields order
+        Object[] values = new Object[fields.size()];
+        for (int i = 0; i < fields.size(); i++) {
+            Field<?> field = fields.get(i);
+            values[i] = row.get(i, field.getType());
+        }
+
+        // create intermediate record
+        Record record = dslContext.newRecord(fields);
+        record.fromArray(values);
+        record.changed(false);
+        return record;
     }
 
 }

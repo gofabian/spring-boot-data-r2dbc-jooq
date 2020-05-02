@@ -4,10 +4,7 @@ import gofabian.db.BookPojo;
 import gofabian.db.BookRecord;
 import gofabian.db.BookTable;
 import gofabian.r2dbc.jooq.ReactiveJooq;
-import org.jooq.DSLContext;
-import org.jooq.Record;
-import org.jooq.Record2;
-import org.jooq.Select;
+import org.jooq.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.r2dbc.core.DatabaseClient;
 
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 
@@ -30,7 +28,10 @@ class RecordTest {
 
     @BeforeEach
     void before() {
-        databaseClient.execute("create table \"book\" ( \"id\" bigint primary key, \"name\" text );")
+        databaseClient.execute("create table \"book\" ( " +
+                "\"id\" bigint primary key auto_increment, " +
+                "\"name\" text, " +
+                "\"timestamp\" timestamp default current_timestamp);")
                 .fetch().rowsUpdated().block();
     }
 
@@ -42,7 +43,7 @@ class RecordTest {
 
     @Test
     void insertRecord() {
-        BookRecord record = dslContext.newRecord(BookTable.BOOK_TABLE).values(42L, "Java Basics");
+        BookRecord record = dslContext.newRecord(BookTable.BOOK_TABLE).value1(42L).value2("Java Basics");
         Integer insertCount = ReactiveJooq.insert(record).block();
         assertEquals(1, insertCount);
 
@@ -53,7 +54,7 @@ class RecordTest {
 
     @Test
     void updateRecord() {
-        BookRecord record = dslContext.newRecord(BookTable.BOOK_TABLE).values(42L, "Java Basics");
+        BookRecord record = dslContext.newRecord(BookTable.BOOK_TABLE).value1(42L).value2("Java Basics");
         ReactiveJooq.insert(record).block();
 
         record.value2("C++ Basics");
@@ -69,7 +70,7 @@ class RecordTest {
 
     @Test
     void deleteRecord() {
-        BookRecord record = dslContext.newRecord(BookTable.BOOK_TABLE).values(1337L, "Olymp");
+        BookRecord record = dslContext.newRecord(BookTable.BOOK_TABLE).value1(1337L).value2("Olymp");
         ReactiveJooq.insert(record).block();
 
         Integer deleteCount = ReactiveJooq.delete(record).block();
@@ -83,7 +84,7 @@ class RecordTest {
     @Test
     void genericRecordResult() {
         {
-            BookRecord preparedRecord = dslContext.newRecord(BookTable.BOOK_TABLE).values(1337L, "Olymp");
+            BookRecord preparedRecord = dslContext.newRecord(BookTable.BOOK_TABLE).value1(1337L).value2("Olymp");
             ReactiveJooq.insert(preparedRecord).block();
         }
         {
@@ -103,7 +104,7 @@ class RecordTest {
     @Test
     void storeAsInsert() {
         // when: store new record
-        BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).values(19L, "book name");
+        BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).value1(19L).value2("book name");
         {
             Integer insertResult = ReactiveJooq.store(bookRecord).block();
             assertNotNull(insertResult);
@@ -143,7 +144,7 @@ class RecordTest {
     @Test
     void storeAsUpdate() {
         // when: store new record
-        BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).values(19L, "book name");
+        BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).value1(19L).value2("book name");
         ReactiveJooq.store(bookRecord).block();
 
         // when: store updated record
@@ -162,7 +163,7 @@ class RecordTest {
 
     @Test
     void unchangedAfterExecution() {
-        BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).values(19L, "book name");
+        BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).value1(19L).value2("book name");
         assertTrue(bookRecord.changed());
         ReactiveJooq.insert(bookRecord).block();
         assertFalse(bookRecord.changed());
@@ -175,12 +176,64 @@ class RecordTest {
 
     @Test
     void changedAfterDeletion() {
-        BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).values(19L, "book name");
+        BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).value1(19L).value2("book name");
         ReactiveJooq.insert(bookRecord).block();
 
         assertFalse(bookRecord.changed());
         ReactiveJooq.delete(bookRecord).block();
         assertTrue(bookRecord.changed());
+    }
+
+    @Test
+    void refreshPrimaryKeyAfterInsert() {
+        BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).value2("book name");
+        ReactiveJooq.insert(bookRecord).block();
+
+        assertNotNull(bookRecord.value1()); // generated primary key returned by default
+        assertNull(bookRecord.value3()); // generated but _not_ returned by default
+    }
+
+    @Test
+    void refreshAllAfterInsert() {
+        try {
+            dslContext.settings().setReturnAllOnUpdatableRecord(true);
+            BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).value2("book name");
+            ReactiveJooq.insert(bookRecord).block();
+
+            assertNotNull(bookRecord.value1()); // generated primary key
+            assertNotNull(bookRecord.value3()); // generated normal column
+        } finally {
+            dslContext.settings().setReturnAllOnUpdatableRecord(false);
+        }
+    }
+
+    @Test
+    void refreshAllAfterUpdate() {
+        try {
+            dslContext.settings().setReturnAllOnUpdatableRecord(true);
+
+            // prepare row
+            BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).value2("book name");
+            ReactiveJooq.insert(bookRecord).block();
+
+            // change row outside of TableRecord
+            LocalDateTime changedTimestamp = LocalDateTime.now().plusYears(10);
+            Query updateQuery = dslContext.update(BookTable.BOOK_TABLE)
+                    .set(BookTable.BOOK_TABLE.TIMESTAMP, changedTimestamp)
+                    .where(BookTable.BOOK_TABLE.ID.eq(bookRecord.value1()));
+            ReactiveJooq.execute(updateQuery).block();
+
+            // chnage row via TableRecord
+            bookRecord.value2("changed book name");
+            Integer updateResult = ReactiveJooq.update(bookRecord).block();
+            assertEquals(1, updateResult);
+
+            // both changes should be in the result
+            assertEquals("changed book name", bookRecord.value2());
+            assertEquals(changedTimestamp, bookRecord.value3());
+        } finally {
+            dslContext.settings().setReturnAllOnUpdatableRecord(false);
+        }
     }
 
 }
