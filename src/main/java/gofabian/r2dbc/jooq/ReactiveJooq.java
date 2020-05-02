@@ -319,7 +319,12 @@ public class ReactiveJooq {
         // collect values in fields order
         Object[] values = new Object[fields.size()];
         for (int i = 0; i < fields.size(); i++) {
-            values[i] = row.get(i, fields.get(i).getType());
+            try {
+                values[i] = row.get(i, fields.get(i).getType());
+            } catch (Exception e) {
+                // fallback: JOOQ RecordMapper converts the value later
+                values[i] = row.get(i, Object.class);
+            }
         }
 
         // create intermediate record

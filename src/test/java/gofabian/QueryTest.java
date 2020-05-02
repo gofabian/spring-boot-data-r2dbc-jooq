@@ -58,7 +58,7 @@ class QueryTest {
     @Test
     void fetch() {
         Select<?> query = dslContext
-                .select(field("id"), field("name"))
+                .select(field("id", UUID.class), field("name", String.class))
                 .from(table("tab"));
         List<? extends Record> records = ReactiveJooq.fetch(query).collectList().block();
         assertNotNull(records);
@@ -69,7 +69,7 @@ class QueryTest {
     @Test
     void fetchOne() {
         Select<?> query = dslContext
-                .select(field("id"), field("name"))
+                .select(field("id", UUID.class), field("name", String.class))
                 .from(table("tab"));
         Record record = ReactiveJooq.fetchOne(query).block();
         assertNotNull(record);
@@ -79,7 +79,7 @@ class QueryTest {
     @Test
     void fetchAny() {
         Select<?> query = dslContext
-                .select(field("id"), field("name"))
+                .select(field("id", UUID.class), field("name", String.class))
                 .from(table("tab"));
         Record record = ReactiveJooq.fetchAny(query).block();
         assertNotNull(record);
@@ -89,7 +89,7 @@ class QueryTest {
     @Test
     void fetchExists() {
         Select<?> query = dslContext
-                .select(field("id"), field("name"))
+                .select(field("id", UUID.class), field("name", String.class))
                 .from(table("tab"));
         Boolean exists = ReactiveJooq.fetchExists(query).block();
         assertNotNull(exists);
@@ -99,7 +99,7 @@ class QueryTest {
     @Test
     void fetchCount() {
         Select<?> query = dslContext
-                .select(field("id"), field("name"))
+                .select(field("id", UUID.class), field("name", String.class))
                 .from(table("tab"));
         Integer count = ReactiveJooq.fetchCount(query).block();
         assertEquals(1, count);
