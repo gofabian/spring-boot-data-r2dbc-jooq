@@ -223,7 +223,7 @@ class RecordTest {
                     .where(BookTable.BOOK_TABLE.ID.eq(bookRecord.value1()));
             ReactiveJooq.execute(updateQuery).block();
 
-            // chnage row via TableRecord
+            // change row via TableRecord
             bookRecord.value2("changed book name");
             Integer updateResult = ReactiveJooq.update(bookRecord).block();
             assertEquals(1, updateResult);
@@ -234,6 +234,19 @@ class RecordTest {
         } finally {
             dslContext.settings().setReturnAllOnUpdatableRecord(false);
         }
+    }
+
+    @Test
+    void refresh() {
+        BookRecord bookRecord = dslContext.newRecord(BookTable.BOOK_TABLE).value2("book name");
+        ReactiveJooq.insert(bookRecord).block();
+
+        Query updateQuery = dslContext.update(BookTable.BOOK_TABLE).set(BookTable.BOOK_TABLE.NAME, "changed name");
+        ReactiveJooq.execute(updateQuery).block();
+
+        ReactiveJooq.refresh(bookRecord).block();
+
+        assertEquals("changed name", bookRecord.value2());
     }
 
 }

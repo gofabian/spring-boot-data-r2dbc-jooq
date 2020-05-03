@@ -30,6 +30,7 @@ Mono<Integer> mono = ReactiveJooq.store(record);
 Mono<Integer> mono = ReactiveJooq.insert(record);
 Mono<Integer> mono = ReactiveJooq.update(record);
 Mono<Integer> mono = ReactiveJooq.delete(record);
+Mono<Void> mono = ReactiveJooq.refresh(record);
 ```
 
 
@@ -78,7 +79,7 @@ If you do not use Spring Boot make sure that `R2dbcJooqAutoConfiguration` is det
 | `record.insert()` -> `int` | `ReactiveJooq.insert(record)` -> `Mono<Integer>` |
 | `record.update()` -> `int` | `ReactiveJooq.update(record)` -> `Mono<Integer>` |
 | `record.delete()` -> `int` | `ReactiveJooq.delete(record)` -> `Mono<Integer>` |
-| `record.refresh()` | ? |
+| `record.refresh()` | `ReactiveJooq.refresh(record)` -> `Mono<Void>` |
 
 
 ## Restrictions

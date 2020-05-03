@@ -32,16 +32,16 @@ public class ReactiveJooq {
 
     private static final EnumSet<SQLDialect> REFRESH_GENERATED_KEYS = EnumSet.of(SQLDialect.MYSQL);
 
-    public static <R extends UpdatableRecord<R>> Mono<Integer> store(R record) {
-        TableField<R, ?>[] keys = record.getTable().getPrimaryKey().getFieldsArray();
+    public static Mono<Integer> store(UpdatableRecord<?> record) {
+        TableField<?, ?>[] keys = record.getTable().getPrimaryKey().getFieldsArray();
         boolean executeUpdate = false;
 
-        for (TableField<R, ?> field : keys) {
+        for (TableField<?, ?> field : keys) {
 
             // If any primary key value is null or changed
             if (record.changed(field) ||
 
-                    // [#3237] or if a NOT NULL primary key value is null, then execute an INSERT
+                    // [JOOQ#3237] or if a NOT NULL primary key value is null, then execute an INSERT
                     (!field.getDataType().nullable() && record.get(field) == null)) {
                 executeUpdate = false;
                 break;
@@ -58,24 +58,24 @@ public class ReactiveJooq {
         }
     }
 
-    public static <R extends TableRecord<R>> Mono<Integer> insert(R record) {
+    public static Mono<Integer> insert(TableRecord<?> record) {
         DSLContext dslContext = record.configuration().dsl();
-        InsertQuery<R> insert = dslContext.insertQuery(record.getTable());
+        InsertQuery<?> insert = dslContext.insertQuery(record.getTable());
         addChangedValues(record, insert);
         return executeStore(record, insert);
 
     }
 
-    public static <R extends UpdatableRecord<R>> Mono<Integer> update(R record) {
+    public static Mono<Integer> update(UpdatableRecord<?> record) {
         DSLContext dslContext = record.configuration().dsl();
-        UpdateQuery<R> update = dslContext.updateQuery(record.getTable());
+        UpdateQuery<?> update = dslContext.updateQuery(record.getTable());
         addChangedValues(record, update);
         Tools.addConditions(update, record, record.getTable().getPrimaryKey().getFieldsArray());
         return executeStore(record, update);
     }
 
 
-    private static <R extends TableRecord<R>> Mono<Integer> executeStore(R record, StoreQuery<R> insert) {
+    private static Mono<Integer> executeStore(TableRecord<?> record, StoreQuery<?> insert) {
         // Don't store records if no value was set by client code
         if (!insert.isExecutable()) {
             if (log.isDebugEnabled()) {
@@ -85,9 +85,9 @@ public class ReactiveJooq {
             return Mono.just(0);
         }
 
-        // [#814] Refresh identity and/or main unique key values
-        // [#1002] Consider also identity columns of non-updatable records
-        // [#1537] Avoid refreshing identity columns on batch inserts
+        // [JOOQ#814] Refresh identity and/or main unique key values
+        // [JOOQ#1002] Consider also identity columns of non-updatable records
+        // [JOOQ#1537] Avoid refreshing identity columns on batch inserts
         Collection<Field<?>> key = setReturningIfNeeded(record, insert);
 
         Mono<Integer> monoResult;
@@ -97,7 +97,7 @@ public class ReactiveJooq {
         } else {
             monoResult = createR2dbcExecuteSpec(insert)
                     .filter(s -> {
-                        if (record.configuration().family() == SQLDialect.MYSQL) {
+                        if (REFRESH_GENERATED_KEYS.contains(record.configuration().family())) {
                             return s.returnGeneratedValues();
                         } else {
                             String[] keyNames = key.stream().map(Field::getName).toArray(String[]::new);
@@ -107,7 +107,7 @@ public class ReactiveJooq {
                     .map((row, metadata) -> convertRowToRecord(row, metadata, record))
                     .one()
                     .flatMap(returnedRecord -> {
-                        // [#1859] If an insert was successful try fetching the generated values.
+                        // [JOOQ#1859] If an insert was successful try fetching the generated values.
                         Mono<Void> monoRefresh = getReturningIfNeeded(returnedRecord, record, key);
                         return monoRefresh.thenReturn(record);
                     })
@@ -125,7 +125,7 @@ public class ReactiveJooq {
     /**
      * Set all changed values of this record to a store query
      */
-    private static <R extends TableRecord<R>> void addChangedValues(R record, StoreQuery<R> query) {
+    private static void addChangedValues(TableRecord<?> record, StoreQuery<?> query) {
         for (Field<?> field : record.fields()) {
             if (record.changed(field)) {
                 addValue(record, field, query);
@@ -136,30 +136,30 @@ public class ReactiveJooq {
     /**
      * Extracted method to ensure generic type safety.
      */
-    private static <T, R extends TableRecord<R>> void addValue(R record, Field<T> field, StoreQuery<?> store) {
+    private static <T> void addValue(TableRecord<?> record, Field<T> field, StoreQuery<?> store) {
         T value = record.get(field);
         store.addValue(field, Tools.field(value, field));
     }
 
-    private static <R extends TableRecord<R>> Collection<Field<?>> setReturningIfNeeded(R record, StoreQuery<R> query) {
+    private static Collection<Field<?>> setReturningIfNeeded(TableRecord<?> record, StoreQuery<?> query) {
         Collection<Field<?>> key = null;
 
         Configuration configuration = record.configuration();
         if (record.configuration() != null) {
             Settings settings = configuration.settings();
 
-            // [#7966] Allow users to turning off the returning clause entirely
+            // [JOOQ#7966] Allow users to turning off the returning clause entirely
             if (!FALSE.equals(settings.isReturnIdentityOnUpdatableRecord())
                 // todo: for batch queries?
 //                    && !TRUE.equals(data(configuration, "DATA_OMIT_RETURNING_CLAUSE"))
             ) {
 
-                // [#1859] Return also non-key columns
+                // [JOOQ#1859] Return also non-key columns
                 if (TRUE.equals(settings.isReturnAllOnUpdatableRecord())) {
                     key = Arrays.asList(record.fields());
                 }
 
-                // [#5940] Getting the primary key mostly doesn't make sense on UPDATE statements
+                // [JOOQ#5940] Getting the primary key mostly doesn't make sense on UPDATE statements
                 else if (query instanceof InsertQuery) {
                     key = getReturning(record);
                 }
@@ -184,10 +184,10 @@ public class ReactiveJooq {
         return null;
     }
 
-    private static <R extends TableRecord<R>> Collection<Field<?>> getReturning(R record) {
+    private static Collection<Field<?>> getReturning(TableRecord<?> record) {
         Collection<Field<?>> result = new LinkedHashSet<>();
 
-        Identity<R, ?> identity = record.getTable().getIdentity();
+        Identity<?, ?> identity = record.getTable().getIdentity();
         if (identity != null) {
             result.add(identity.getField());
         }
@@ -200,7 +200,7 @@ public class ReactiveJooq {
         return result;
     }
 
-    private static <R extends TableRecord<R>, T extends UpdatableRecord<T>> Mono<Void> getReturningIfNeeded(Record returnedRecord, R record, Collection<Field<?>> key) {
+    private static Mono<Void> getReturningIfNeeded(Record returnedRecord, TableRecord<?> record, Collection<Field<?>> key) {
         if (key != null && !key.isEmpty()) {
 
             if (returnedRecord != null) {
@@ -210,14 +210,11 @@ public class ReactiveJooq {
                 }
             }
 
-            // [#1859] In some databases, not all fields can be fetched via getGeneratedKeys()
+            // [JOOQ#1859] In some databases, not all fields can be fetched via getGeneratedKeys()
             if (TRUE.equals(record.configuration().settings().isReturnAllOnUpdatableRecord())
                     && REFRESH_GENERATED_KEYS.contains(record.configuration().family())
                     && record instanceof UpdatableRecord) {
-                // todo: refresh
-                //noinspection unchecked
-//                return refresh((T) record, key.toArray(new Field<?>[0]));
-//                ((UpdatableRecord<?>) record).refresh(key.toArray(new Field<?>[0]));
+                return refresh((UpdatableRecord<?>) record, key.toArray(new Field<?>[0]));
             }
         }
 
@@ -227,7 +224,7 @@ public class ReactiveJooq {
     /**
      * Extracted method to ensure generic type safety.
      */
-    private static <T, R extends TableRecord<R>> void setValue(Record sourceRecord, R targetRecord, Field<T> field) {
+    private static <T> void setValue(Record sourceRecord, TableRecord<?> targetRecord, Field<T> field) {
         T value = sourceRecord.get(field);
         targetRecord.setValue(field, value);
     }
@@ -242,9 +239,38 @@ public class ReactiveJooq {
         Mono<Integer> monoResult = execute(delete);
 
         return monoResult.doFinally(result -> {
-            // [#673] [#3363] If store() is called after delete(), a new INSERT should
+            // [JOOQ#673] [JOOQ#3363] If store() is called after delete(), a new INSERT should
             // be executed and the record should be recreated
             record.changed(true);
+        });
+    }
+
+
+    public static <R extends UpdatableRecord<R>> Mono<Void> refresh(R record) {
+        return refresh(record, record.fields());
+    }
+
+    private static Mono<Void> refresh(UpdatableRecord<?> record, Field<?>... refreshFields) {
+        DSLContext dslContext = record.configuration().dsl();
+        SelectQuery<Record> select = dslContext.selectQuery();
+        select.addSelect(refreshFields);
+        select.addFrom(record.getTable());
+        Tools.addConditions(select, record, record.getTable().getPrimaryKey().getFieldsArray());
+
+        Mono<Record> monoRecord = fetchOne(select);
+
+        monoRecord = monoRecord.doOnNext(returnedRecord -> {
+            for (Field<?> field : refreshFields) {
+                setValue(returnedRecord, record, field);
+                record.changed(field, false);
+            }
+        });
+
+        return monoRecord.hasElement().flatMap(hasElement -> {
+            if (!hasElement) {
+                throw new NoDataFoundException("Exactly one row expected for refresh. Record does not exist in database.");
+            }
+            return Mono.empty();
         });
     }
 
@@ -337,9 +363,9 @@ public class ReactiveJooq {
         return record.into(jooqQuery.getRecordType());
     }
 
-    private static <R extends TableRecord<R>> Record convertRowToRecord(Row row, RowMetadata metadata, R tableRecord) {
+    private static Record convertRowToRecord(Row row, RowMetadata metadata, TableRecord<?> tableRecord) {
         DSLContext dslContext = tableRecord.configuration().dsl();
-        Table<R> table = tableRecord.getTable();
+        Table<?> table = tableRecord.getTable();
 
         // collect table fields by name
         List<Field<?>> fields = new ArrayList<>();
