@@ -11,24 +11,25 @@ Usage:
 // fetch queries
 var selectQuery = dslContext.selectCount().from(BOOK_TABLE);
 Flux<Record1<Integer>> flux = ReactiveJooq.fetch(selectQuery);
-Mono<Record1<Integer>> monoOne = ReactiveJooq.fetchOne(selectQuery);
-Mono<Record1<Integer>> monoAny = ReactiveJooq.fetchAny(selectQuery);
-Mono<Integer> monoCount = ReactiveJooq.fetchCount(selectQuery);
-Mono<Boolean> monoExists = ReactiveJooq.fetchExists(selectQuery);
+Mono<Record1<Integer>> mono = ReactiveJooq.fetchOne(selectQuery);
+Mono<Record1<Integer>> mono = ReactiveJooq.fetchAny(selectQuery);
+Mono<Integer> mono = ReactiveJooq.fetchCount(selectQuery);
+Mono<Boolean> mono = ReactiveJooq.fetchExists(selectQuery);
 
 // fetch queries with generated JOOQ tables
 var tableQuery = dslContext.selectFrom(BOOK_TABLE);
 Flux<BookRecord> flux = ReactiveJooq.fetch(selectQuery);
 
 // manipulating queries
-var insertQuery = dslContext.insertInto(table("books"), field("name")).values("book");
-Mono<Integer> monoUpdateCount = ReactiveJooq.execute(insertQuery);
+var insertQuery = dslContext.insertInto(table("book"), field("name")).values("book");
+Mono<Integer> mono = ReactiveJooq.execute(insertQuery);
 
 // record manipulation
-var myRecord = dslContext.newRecord(MY_TABLE);
-Mono<Integer> monoInsertRecordCount = ReactiveJooq.insert(myRecord);
-Mono<Integer> monoUpdateRecordCount = ReactiveJooq.update(myRecord);
-Mono<Integer> monoDeleteRecordCount = ReactiveJooq.delete(myRecord);
+var record = dslContext.newRecord(BOOK_TABLE);
+Mono<Integer> mono = ReactiveJooq.store(record);
+Mono<Integer> mono = ReactiveJooq.insert(record);
+Mono<Integer> mono = ReactiveJooq.update(record);
+Mono<Integer> mono = ReactiveJooq.delete(record);
 ```
 
 
@@ -73,10 +74,10 @@ If you do not use Spring Boot make sure that `R2dbcJooqAutoConfiguration` is det
 | `query.fetchAny()` -> `R` | `ReactiveJooq.fetchAny(query)` -> `Mono<R>` |
 | `dslContext.fetchExists(query)` -> `boolean` | `ReactiveJooq.fetchExists(query)` -> `Mono<Boolean>` |
 | `dslContext.fetchCount(query)` -> `int` | `ReactiveJooq.fetchCount(query)` -> `Mono<Integer>` |
+| `record.store()` -> `int` | `ReactiveJooq.store(record)` -> `Mono<Integer>` |
 | `record.insert()` -> `int` | `ReactiveJooq.insert(record)` -> `Mono<Integer>` |
 | `record.update()` -> `int` | `ReactiveJooq.update(record)` -> `Mono<Integer>` |
 | `record.delete()` -> `int` | `ReactiveJooq.delete(record)` -> `Mono<Integer>` |
-| `record.store()` -> `int` | ? |
 | `record.refresh()` | ? |
 
 
