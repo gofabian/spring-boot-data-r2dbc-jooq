@@ -5,6 +5,8 @@ import gofabian.db.BookRecord;
 import gofabian.db.BookTable;
 import gofabian.r2dbc.jooq.ReactiveJooq;
 import org.jooq.*;
+import org.jooq.impl.DSL;
+import org.jooq.impl.SQLDataType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,17 +30,18 @@ class RecordTest {
 
     @BeforeEach
     void before() {
-        databaseClient.execute("create table \"book\" ( " +
-                "\"id\" bigint primary key auto_increment, " +
-                "\"name\" text, " +
-                "\"timestamp\" timestamp default current_timestamp);")
-                .fetch().rowsUpdated().block();
+        Query query = dslContext.createTable(DSL.name("book"))
+                .column(DSL.field(DSL.name("id"), Long.class), SQLDataType.BIGINT.identity(true))
+                .column(DSL.field(DSL.name("name"), String.class), SQLDataType.VARCHAR)
+                .column(DSL.field(DSL.name("timestamp"), LocalDateTime.class), SQLDataType.LOCALDATETIME.defaultValue(DSL.currentLocalDateTime()))
+                .constraint(DSL.constraint("pk_id").primaryKey(DSL.name("id")));
+        databaseClient.execute(query.getSQL()).fetch().rowsUpdated().block();
     }
 
     @AfterEach
     void after() {
-        databaseClient.execute("drop table \"book\";").
-                fetch().rowsUpdated().block();
+        Query query = dslContext.dropTable(DSL.name("book"));
+        databaseClient.execute(query.getSQL()).fetch().rowsUpdated().block();
     }
 
     @Test
