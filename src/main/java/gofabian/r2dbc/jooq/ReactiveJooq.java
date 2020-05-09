@@ -1,13 +1,13 @@
 package gofabian.r2dbc.jooq;
 
 import io.r2dbc.spi.Row;
-import io.r2dbc.spi.RowMetadata;
 import org.jooq.*;
 import org.jooq.conf.ParamType;
 import org.jooq.conf.Settings;
 import org.jooq.exception.NoDataFoundException;
 import org.jooq.tools.JooqLogger;
 import org.springframework.data.r2dbc.core.DatabaseClient;
+import org.springframework.data.r2dbc.core.RowsFetchSpec;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -29,8 +29,6 @@ import static java.lang.Boolean.TRUE;
 public class ReactiveJooq {
 
     private static final JooqLogger log = JooqLogger.getLogger(ReactiveJooq.class);
-
-    private static final EnumSet<SQLDialect> REFRESH_GENERATED_KEYS = EnumSet.of(SQLDialect.MYSQL);
 
     public static Mono<Integer> store(UpdatableRecord<?> record) {
         TableField<?, ?>[] keys = record.getTable().getPrimaryKey().getFieldsArray();
@@ -95,16 +93,7 @@ public class ReactiveJooq {
         if (key == null || key.isEmpty()) {
             monoResult = execute(insert);
         } else {
-            monoResult = createR2dbcExecuteSpec(insert)
-                    .filter(s -> {
-                        if (REFRESH_GENERATED_KEYS.contains(record.configuration().family())) {
-                            return s.returnGeneratedValues();
-                        } else {
-                            String[] keyNames = key.stream().map(Field::getName).toArray(String[]::new);
-                            return s.returnGeneratedValues(keyNames);
-                        }
-                    })
-                    .map((row, metadata) -> convertRowToRecord(row, metadata, record))
+            monoResult = createR2dbcExecuteReturningSpec(insert)
                     .one()
                     .flatMap(returnedRecord -> {
                         // [JOOQ#1859] If an insert was successful try fetching the generated values.
@@ -212,7 +201,7 @@ public class ReactiveJooq {
 
             // [JOOQ#1859] In some databases, not all fields can be fetched via getGeneratedKeys()
             if (TRUE.equals(record.configuration().settings().isReturnAllOnUpdatableRecord())
-                    && REFRESH_GENERATED_KEYS.contains(record.configuration().family())
+                    && record.configuration().family() == SQLDialect.MYSQL
                     && record instanceof UpdatableRecord) {
                 return refresh((UpdatableRecord<?>) record, key.toArray(new Field<?>[0]));
             }
@@ -281,21 +270,100 @@ public class ReactiveJooq {
                 .rowsUpdated();
     }
 
+    private static final java.lang.reflect.Field delegatingQueryField;
+    private static final java.lang.reflect.Field tableField;
+    private static final java.lang.reflect.Field returningResolvedListField;
+    private static final java.lang.reflect.Field returningListField;
+
+    static {
+        try {
+            Class<?> delegatingQueryClass = Class.forName("org.jooq.impl.AbstractDelegatingQuery");
+            delegatingQueryField = delegatingQueryClass.getDeclaredField("delegate");
+            delegatingQueryField.setAccessible(true);
+            Class<?> dmlQueryClass = Class.forName("org.jooq.impl.AbstractDMLQuery");
+            tableField = dmlQueryClass.getDeclaredField("table");
+            tableField.setAccessible(true);
+            returningListField = dmlQueryClass.getDeclaredField("returning");
+            returningListField.setAccessible(true);
+            returningResolvedListField = dmlQueryClass.getDeclaredField("returningResolvedAsterisks");
+            returningResolvedListField.setAccessible(true);
+        } catch (ClassNotFoundException | NoSuchFieldException e) {
+            throw new RuntimeException("Unsupported JOOQ version", e);
+        }
+    }
+
+    private static <R> R getPrivateField(Object object, java.lang.reflect.Field privateField) {
+        try {
+            //noinspection unchecked
+            return (R) privateField.get(object);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Unsupported JOOQ version", e);
+        }
+    }
+
+    public static <R extends Record> Flux<R> executeReturning(InsertResultStep<R> query) {
+        StoreQuery<R> storeQuery = getPrivateField(query, delegatingQueryField);
+        return createR2dbcExecuteReturningSpec(storeQuery).all();
+    }
+
+    public static <R extends Record> Mono<R> executeReturningOne(InsertResultStep<R> query) {
+        StoreQuery<R> storeQuery = getPrivateField(query, delegatingQueryField);
+        return createR2dbcExecuteReturningSpec(storeQuery).one();
+    }
+
+    public static <R extends Record> Flux<R> executeReturning(UpdateResultStep<R> query) {
+        StoreQuery<R> storeQuery = getPrivateField(query, delegatingQueryField);
+        return createR2dbcExecuteReturningSpec(storeQuery).all();
+    }
+
+    public static <R extends Record> Mono<R> executeReturningOne(UpdateResultStep<R> query) {
+        StoreQuery<R> storeQuery = getPrivateField(query, delegatingQueryField);
+        return createR2dbcExecuteReturningSpec(storeQuery).one();
+    }
+
+    private static <R extends Record> RowsFetchSpec<R> createR2dbcExecuteReturningSpec(StoreQuery<R> query) {
+        DSLContext dslContext = query.configuration().dsl();
+
+        Table<R> table = getPrivateField(query, tableField);
+        List<Field<?>> returningFields = new ArrayList<>(getPrivateField(query, returningListField));
+        List<Field<?>> returningResolvedFields = new ArrayList<>(getPrivateField(query, returningResolvedListField));
+
+        // create R2DBC execution spec without "RETURNING" clause
+        query.setReturning(Collections.emptyList());
+        DatabaseClient.GenericExecuteSpec executeSpec = createR2dbcExecuteSpec(query);
+        query.setReturning(returningFields);
+
+        // require generated values in result set
+        executeSpec = executeSpec.filter(s -> {
+            if (returningResolvedFields.isEmpty()) {
+                // no returning required
+                return s;
+            }
+            String[] fieldNames = returningResolvedFields.stream().map(Field::getName).toArray(String[]::new);
+            return s.returnGeneratedValues(fieldNames);
+        });
+
+        // convert result to records
+        Class<? extends R> recordType = table.getRecordType();
+        return executeSpec.map((row, metadata) ->
+                convertRowToRecord(dslContext, row, returningResolvedFields, recordType));
+    }
+
     public static <R extends Record> Flux<R> fetch(Select<R> jooqQuery) {
         return createR2dbcExecuteSpec(jooqQuery)
-                .map(row -> convertRowToGenericRecord(row, jooqQuery))
+                .map((row, metadata) -> convertRowToRecord(row, jooqQuery))
                 .all();
     }
 
     public static <R extends Record> Mono<R> fetchOne(Select<R> jooqQuery) {
         return createR2dbcExecuteSpec(jooqQuery)
-                .map(row -> convertRowToGenericRecord(row, jooqQuery))
+                .map((row, metadata) -> convertRowToRecord(row, jooqQuery))
                 .one();
     }
 
     public static <R extends Record> Mono<R> fetchAny(Select<R> jooqQuery) {
         return createR2dbcExecuteSpec(jooqQuery)
-                .map(row -> convertRowToGenericRecord(row, jooqQuery))
+                .map((row, metadata) -> convertRowToRecord(row, jooqQuery))
                 .first();
     }
 
@@ -335,54 +403,15 @@ public class ReactiveJooq {
         return executeSpec;
     }
 
-    /**
-     * Convert result from R2DBC database client into JOOQ record.
-     */
-    private static <R extends Record> R convertRowToGenericRecord(Row row, Select<R> jooqQuery) {
-        // get selected fields
-        List<Field<?>> fields = jooqQuery.getSelect();
-
-        // collect values in fields order
-        Object[] values = new Object[fields.size()];
-        for (int i = 0; i < fields.size(); i++) {
-            Field<?> field = fields.get(i);
-            try {
-                values[i] = row.get(i, field.getType());
-            } catch (IllegalArgumentException e) {
-                // fallback: JOOQ RecordMapper converts the value later
-                values[i] = row.get(i, Object.class);
-                log.debug("R2DBC cannot convert value to field type: " + field.getType() + ", value=" + values[i]
-                        + ", value type=" + (values[i] == null ? null : values[i].getClass()));
-            }
-        }
-
-        // create intermediate record
+    private static <R extends Record> R convertRowToRecord(Row row, Select<R> jooqQuery) {
         DSLContext dslContext = jooqQuery.configuration().dsl();
-        Record record = dslContext.newRecord(fields);
-        record.fromArray(values);
-        record.changed(false);
-
-        // convert to expected record type
-        return record.into(jooqQuery.getRecordType());
+        List<Field<?>> allFields = jooqQuery.getSelect();
+        Class<? extends R> recordType = jooqQuery.getRecordType();
+        return convertRowToRecord(dslContext, row, allFields, recordType);
     }
 
-    private static Record convertRowToRecord(Row row, RowMetadata metadata, TableRecord<?> tableRecord) {
-        DSLContext dslContext = tableRecord.configuration().dsl();
-        Table<?> table = tableRecord.getTable();
-
-        // collect table fields by name
-        List<Field<?>> fields = new ArrayList<>();
-        metadata.getColumnMetadatas().forEach(column -> {
-            for (Field<?> tableField : table.fields()) {
-                if (tableField.getName().equals(column.getName())) {
-                    fields.add(tableField);
-                    return;
-                }
-            }
-            throw new IllegalArgumentException("Table '" + table.getName() + "' does not contain field '"
-                    + column.getName() + "'");
-        });
-
+    private static <R extends Record> R convertRowToRecord(DSLContext dslContext, Row row, List<Field<?>> fields,
+                                                           Class<? extends R> recordType) {
         // collect values in fields order
         Object[] values = new Object[fields.size()];
         for (int i = 0; i < fields.size(); i++) {
@@ -401,7 +430,8 @@ public class ReactiveJooq {
         Record record = dslContext.newRecord(fields);
         record.fromArray(values);
         record.changed(false);
-        return record;
+
+        return record.into(recordType);
     }
 
 }
