@@ -17,6 +17,8 @@ import static org.jooq.impl.DSL.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
+//@SpringBootTest(properties = "spring.r2dbc.url=r2dbc:tc:postgresql:///db?TC_IMAGE_TAG=9.6.8")
+//@SpringBootTest(properties = "spring.r2dbc.url=r2dbc:tc:mysql:///db?TC_IMAGE_TAG=5.6.23")
 class QueryTest {
 
     @Autowired

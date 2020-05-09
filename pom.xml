@@ -61,11 +61,48 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>io.r2dbc</groupId>
             <artifactId>r2dbc-h2</artifactId>
             <version>0.8.3.RELEASE</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.r2dbc</groupId>
+            <artifactId>r2dbc-postgresql</artifactId>
+            <version>0.8.1.RELEASE</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>dev.miku</groupId>
+            <artifactId>r2dbc-mysql</artifactId>
+            <version>0.8.1.RELEASE</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>r2dbc</artifactId>
+            <version>1.14.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>1.14.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>mysql</artifactId>
+            <version>1.14.1</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- somehow the JDBC driver is necessary for testcontainers -->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>8.0.20</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

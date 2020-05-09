@@ -20,7 +20,10 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+// todo: run this once for every db type -> JUnit 5 extension?
 @SpringBootTest
+//@SpringBootTest(properties = "spring.r2dbc.url=r2dbc:tc:postgresql:///db?TC_IMAGE_TAG=9.6.8")
+//@SpringBootTest(properties = "spring.r2dbc.url=r2dbc:tc:mysql:///db?TC_IMAGE_TAG=5.6.23")
 class RecordTest {
 
     @Autowired
