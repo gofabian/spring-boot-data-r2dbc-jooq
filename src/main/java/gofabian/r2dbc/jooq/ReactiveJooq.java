@@ -12,6 +12,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.lang.Boolean.FALSE;
 import static java.lang.Boolean.TRUE;
@@ -390,14 +391,16 @@ public class ReactiveJooq {
         DatabaseClient databaseClient = (DatabaseClient) jooqQuery.configuration().data("databaseClient");
         String sql = jooqQuery.getSQL(ParamType.NAMED);
         DatabaseClient.GenericExecuteSpec executeSpec = databaseClient.execute(sql);
-        List<Object> bindValues = jooqQuery.getBindValues();
-        for (int i = 0; i < bindValues.size(); i++) {
-            Object value = bindValues.get(i);
-            if (value == null) {
-                // with the random type (Boolean) we select an R2DBC codec that can encode null
-                executeSpec = executeSpec.bindNull(i, Boolean.class);
+
+        List<Param<?>> parameters = jooqQuery.getParams().values().stream()
+                .filter(p -> p.getParamType() != ParamType.INLINED).collect(Collectors.toList());
+        for (int i = 0; i < parameters.size(); i++) {
+            Param<?> parameter = parameters.get(i);
+            Object bindValue = parameter.getValue();
+            if (bindValue == null) {
+                executeSpec = executeSpec.bindNull(i, parameter.getType());
             } else {
-                executeSpec = executeSpec.bind(i, value);
+                executeSpec = executeSpec.bind(i, bindValue);
             }
         }
         return executeSpec;
