@@ -57,6 +57,31 @@ the DSLContext in your code.
 If you do not use Spring Boot make sure that `R2dbcJooqAutoConfiguration` is detected by Spring.
 
 
+## Example with Spring Boot
+
+```java
+@Service
+public class ReactiveBookService {
+    @Autowired DSLContext dslContext;
+
+    public Mono<BookPojo> getBookById(Long id) {
+        Query query = dslContext.selectFrom(BOOK_TABLE).where(BOOK_TABLE.ID.eq(id));
+        return ReactiveJooq.fetchOne(query).map(r -> r.into(BookPojo.class));
+    }
+
+    public Mono<Integer> createBook(BookPojo book) {
+        BookRecord record = dslContext.newRecord(BOOK_TABLE, book);
+        return ReactiveJooq.insert(record);
+    }
+
+    public Mono<Integer> deleteBookById(Long id) {
+        Query query = dslContext.deleteFrom(BOOK_TABLE).where(BOOK_TABLE.ID.eq(id));
+        return ReactiveJooq.execute(query);
+    }
+}
+```
+
+
 ## Support
 
 - Spring Boot 2.3.0.M4
