@@ -119,6 +119,35 @@ Further unsupported features:
 - `settings.setFetchSize(...)`
 - ...
 
+
+## Release process
+
+(0) Signing key must be available
+
+    $ gpg --list-keys
+
+(1) Manuel steps to prepare release, e. g. update version in Readme file
+
+    $ nano Readme.md
+    $ git add . && git commit -m 'Bump version'
+
+(2) Prepare release: update version in pom.xml, git tag
+
+     $ JAVA_HOME=/usr/lib/jvm/java-8-openjdk mvn release:prepare
+
+(3) Perform release: build artifact, upload to OSS staging, release to Maven Central
+
+    $  JAVA_HOME=/usr/lib/jvm/java-8-openjdk mvn release:perform
+
+(4) Publish release to github, too
+
+    $ git push --tags
+
+(5) Release should appear in Maven Central after some minutes:
+
+https://repo1.maven.org/maven2/de/gofabian/spring-boot-data-r2dbc-jooq/
+
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
