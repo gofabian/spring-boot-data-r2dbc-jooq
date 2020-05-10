@@ -1,5 +1,6 @@
 package gofabian.db;
 
+import org.jooq.Identity;
 import org.jooq.TableField;
 import org.jooq.UniqueKey;
 import org.jooq.impl.DSL;
@@ -10,6 +11,8 @@ import org.jooq.impl.TableImpl;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+
+import static org.jooq.impl.Internal.createIdentity;
 
 public class BookTable extends TableImpl<BookRecord> {
 
@@ -23,6 +26,11 @@ public class BookTable extends TableImpl<BookRecord> {
 
     public BookTable() {
         super(DSL.name("book"), null);
+    }
+
+    @Override
+    public Identity<BookRecord, ?> getIdentity() {
+        return createIdentity(this, ID);
     }
 
     @Override

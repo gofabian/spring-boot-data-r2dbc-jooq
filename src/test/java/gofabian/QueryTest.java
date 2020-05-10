@@ -1,7 +1,10 @@
 package gofabian;
 
 import gofabian.r2dbc.jooq.ReactiveJooq;
-import org.jooq.*;
+import org.jooq.DSLContext;
+import org.jooq.Query;
+import org.jooq.Record;
+import org.jooq.Select;
 import org.jooq.conf.ParamType;
 import org.jooq.impl.SQLDataType;
 import org.junit.jupiter.api.AfterEach;
@@ -56,79 +59,6 @@ class QueryTest {
                 .set(field(name("name")), "another fab");
         Integer insertCount = ReactiveJooq.execute(query).block();
         assertEquals(1, insertCount);
-    }
-
-    @Test
-    void executeInsertReturning() {
-        InsertResultStep<Record> query = dslContext
-                .insertInto(table(name("tab")), field(name("name"), String.class))
-                .values("bob")
-                .values("pia")
-                .returning(field(name("id"), Long.class));
-        List<Record> records = ReactiveJooq.executeReturning(query).collectList().block();
-
-        assertNotNull(records);
-        assertEquals(2, records.size());
-        assertEquals(1, records.get(0).size());
-        assertEquals("id", records.get(0).field(0).getName());
-        assertTrue(records.get(0).get(0) instanceof Long);
-        assertEquals(1, records.get(1).size());
-        assertEquals("id", records.get(1).field(0).getName());
-        assertTrue(records.get(1).get(0) instanceof Long);
-    }
-
-    @Test
-    void executeInsertReturningOne() {
-        InsertResultStep<Record> query = dslContext
-                .insertInto(table(name("tab")), field(name("name"), String.class))
-                .values("bob")
-                .returning(field(name("id"), Long.class));
-        Record record = ReactiveJooq.executeReturningOne(query).block();
-
-        assertNotNull(record);
-        assertEquals(1, record.size());
-        assertEquals("id", record.field(0).getName());
-        assertTrue(record.get(0) instanceof Long);
-    }
-
-    @Test
-    void executeUpdateReturning() {
-        Query insertQuery = dslContext
-                .insertInto(table(name("tab")), field(name("name"), String.class))
-                .values("aaa")
-                .values("aaa");
-        ReactiveJooq.execute(insertQuery).block();
-
-        UpdateResultStep<Record> query = dslContext
-                .update(table(name("tab")))
-                .set(field(name("name"), String.class), "bob")
-                .where(field(name("name"), String.class).eq("aaa"))
-                .returning(field(name("name"), String.class));
-        List<Record> records = ReactiveJooq.executeReturning(query).collectList().block();
-
-        assertNotNull(records);
-        assertEquals(2, records.size());
-        assertEquals(1, records.get(0).size());
-        assertEquals("name", records.get(0).field(0).getName());
-        assertEquals("bob", records.get(0).get(0));
-        assertEquals(1, records.get(1).size());
-        assertEquals("name", records.get(1).field(0).getName());
-        assertEquals("bob", records.get(1).get(0));
-    }
-
-    @Test
-    void executeUpdateReturningOne() {
-        UpdateResultStep<Record> query = dslContext
-                .update(table(name("tab")))
-                .set(field(name("name"), String.class), "bob")
-                .where(field(name("name"), String.class).eq("fab"))
-                .returning(field(name("name"), String.class));
-        Record record = ReactiveJooq.executeReturningOne(query).block();
-
-        assertNotNull(record);
-        assertEquals(1, record.size());
-        assertEquals("name", record.field(0).getName());
-        assertEquals("bob", record.get(0));
     }
 
     @Test

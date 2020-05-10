@@ -7,7 +7,6 @@ import org.jooq.conf.Settings;
 import org.jooq.exception.NoDataFoundException;
 import org.jooq.tools.JooqLogger;
 import org.springframework.data.r2dbc.core.DatabaseClient;
-import org.springframework.data.r2dbc.core.RowsFetchSpec;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -16,6 +15,8 @@ import java.util.stream.Collectors;
 
 import static java.lang.Boolean.FALSE;
 import static java.lang.Boolean.TRUE;
+import static org.jooq.SQLDialect.H2;
+import static org.jooq.SQLDialect.POSTGRES;
 
 
 /**
@@ -94,11 +95,12 @@ public class ReactiveJooq {
         if (key == null || key.isEmpty()) {
             monoResult = execute(insert);
         } else {
-            monoResult = createR2dbcExecuteReturningSpec(insert)
-                    .one()
-                    .flatMap(returnedRecord -> {
+            monoResult = executeReturning(insert)
+                    .collectList()
+                    .flatMap(returnedRecords -> {
                         // [JOOQ#1859] If an insert was successful try fetching the generated values.
-                        Mono<Void> monoRefresh = getReturningIfNeeded(returnedRecord, record, key);
+                        TableRecord<?> r = returnedRecords.isEmpty() ? null : (TableRecord<?>) returnedRecords.get(0);
+                        Mono<Void> monoRefresh = getReturningIfNeeded(r, record, key);
                         return monoRefresh.thenReturn(record);
                     })
                     .hasElement()
@@ -304,67 +306,133 @@ public class ReactiveJooq {
 
     public static <R extends Record> Flux<R> executeReturning(InsertResultStep<R> query) {
         StoreQuery<R> storeQuery = getPrivateField(query, delegatingQueryField);
-        return createR2dbcExecuteReturningSpec(storeQuery).all();
+        return executeReturning(storeQuery);
     }
 
     public static <R extends Record> Mono<R> executeReturningOne(InsertResultStep<R> query) {
         StoreQuery<R> storeQuery = getPrivateField(query, delegatingQueryField);
-        return createR2dbcExecuteReturningSpec(storeQuery).one();
+        return executeReturningOne(storeQuery);
     }
 
+    @Support({H2, POSTGRES})
     public static <R extends Record> Flux<R> executeReturning(UpdateResultStep<R> query) {
         StoreQuery<R> storeQuery = getPrivateField(query, delegatingQueryField);
-        return createR2dbcExecuteReturningSpec(storeQuery).all();
+        return executeReturning(storeQuery);
     }
 
+    @Support({H2, POSTGRES})
     public static <R extends Record> Mono<R> executeReturningOne(UpdateResultStep<R> query) {
         StoreQuery<R> storeQuery = getPrivateField(query, delegatingQueryField);
-        return createR2dbcExecuteReturningSpec(storeQuery).one();
+        return executeReturningOne(storeQuery);
     }
 
-    private static <R extends Record> RowsFetchSpec<R> createR2dbcExecuteReturningSpec(StoreQuery<R> query) {
+    private static <R extends Record> Mono<R> executeReturningOne(StoreQuery<R> query) {
+        return executeReturning(query).collectList().flatMap(list -> {
+            if (list.isEmpty()) {
+                return Mono.empty();
+            } else {
+                return Mono.just(list.get(0));
+            }
+        });
+    }
+
+    private static <R extends Record> Flux<R> executeReturning(StoreQuery<R> query) {
         DSLContext dslContext = query.configuration().dsl();
 
         Table<R> table = getPrivateField(query, tableField);
         List<Field<?>> returningFields = new ArrayList<>(getPrivateField(query, returningListField));
         List<Field<?>> returningResolvedFields = new ArrayList<>(getPrivateField(query, returningResolvedListField));
 
+        //noinspection unchecked
+        Class<R> recordType = (Class<R>) table.getRecordType();
+
         // create R2DBC execution spec without "RETURNING" clause
         query.setReturning(Collections.emptyList());
         DatabaseClient.GenericExecuteSpec executeSpec = createR2dbcExecuteSpec(query);
         query.setReturning(returningFields);
 
+        if (returningFields.isEmpty()) {
+            return executeSpec.then().flatMapMany(x -> Flux.empty());
+        }
+
         // require generated values in result set
         executeSpec = executeSpec.filter(s -> {
-            if (returningResolvedFields.isEmpty()) {
-                // no returning required
-                return s;
+            switch (dslContext.family()) {
+                case MYSQL:
+                    // MySQL can only return generated id
+                    return s.returnGeneratedValues();
+                case H2:
+                case POSTGRES:
+                default:
+                    String[] fieldNames = returningResolvedFields.stream().map(Field::getName).toArray(String[]::new);
+                    return s.returnGeneratedValues(fieldNames);
             }
-            String[] fieldNames = returningResolvedFields.stream().map(Field::getName).toArray(String[]::new);
-            return s.returnGeneratedValues(fieldNames);
         });
 
         // convert result to records
-        Class<? extends R> recordType = table.getRecordType();
-        return executeSpec.map((row, metadata) ->
-                convertRowToRecord(dslContext, row, returningResolvedFields, recordType));
+        switch (dslContext.family()) {
+            case MYSQL:
+                Identity<R, ?> identity = table.getIdentity();
+                // This shouldn't be null, as relevant dialects should
+                // return empty generated keys ResultSet
+                if (identity == null) {
+                    return executeSpec.then().flatMapMany(x -> Flux.empty());
+                }
+                //noinspection unchecked
+                Field<Object> idField = (Field<Object>) identity.getField();
+
+                return executeSpec
+                        .map(row -> {
+                            Object value = row.get(0, Object.class);
+                            return idField.getDataType().convert(value);
+                        })
+                        .all().collectList()
+                        .flatMapMany(ids -> {
+                            if (returningResolvedFields.size() == 1 &&
+                                    returningResolvedFields.get(0).getName().equals(idField.getName())) {
+                                // Only the IDENTITY value was requested. No need for an additional query
+                                List<Record> records = ids.stream().map(id -> {
+                                    Record record = dslContext.newRecord(returningResolvedFields);
+                                    record.set(idField, id);
+                                    record.changed(false);
+                                    return record;
+                                }).collect(Collectors.toList());
+                                return Flux.fromIterable(records);
+                            } else {
+                                // Other values are requested, too. Run another query
+                                Select<Record> select = dslContext
+                                        .select(returningFields)
+                                        .from(table)
+                                        .where(idField.in(ids));
+                                return ReactiveJooq.fetch(select);
+                            }
+                        })
+                        .map(r -> r.into(recordType));
+
+            case H2:
+            case POSTGRES:
+            default:
+                return executeSpec
+                        .map(row -> convertRowToRecord(dslContext, row, returningResolvedFields, recordType))
+                        .all();
+        }
     }
 
     public static <R extends Record> Flux<R> fetch(Select<R> jooqQuery) {
         return createR2dbcExecuteSpec(jooqQuery)
-                .map((row, metadata) -> convertRowToRecord(row, jooqQuery))
+                .map(row -> convertRowToRecord(row, jooqQuery))
                 .all();
     }
 
     public static <R extends Record> Mono<R> fetchOne(Select<R> jooqQuery) {
         return createR2dbcExecuteSpec(jooqQuery)
-                .map((row, metadata) -> convertRowToRecord(row, jooqQuery))
+                .map(row -> convertRowToRecord(row, jooqQuery))
                 .one();
     }
 
     public static <R extends Record> Mono<R> fetchAny(Select<R> jooqQuery) {
         return createR2dbcExecuteSpec(jooqQuery)
-                .map((row, metadata) -> convertRowToRecord(row, jooqQuery))
+                .map(row -> convertRowToRecord(row, jooqQuery))
                 .first();
     }
 

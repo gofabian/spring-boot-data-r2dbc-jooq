@@ -223,7 +223,7 @@ class RecordTest {
             ReactiveJooq.insert(bookRecord).block();
 
             // change row outside of TableRecord
-            LocalDateTime changedTimestamp = LocalDateTime.now().plusYears(10);
+            LocalDateTime changedTimestamp = LocalDateTime.now().plusYears(10).withNano(0);
             Query updateQuery = dslContext.update(BookTable.BOOK_TABLE)
                     .set(BookTable.BOOK_TABLE.TIMESTAMP, changedTimestamp)
                     .where(BookTable.BOOK_TABLE.ID.eq(bookRecord.value1()));
