@@ -71,7 +71,7 @@ class Tools {
      * @param value The argument object
      * @param field The field to take the bind value type from
      * @return The argument object itself, if it is a {@link Field}, or a bind
-     *         value created from the argument object.
+     * value created from the argument object.
      */
     @SuppressWarnings("unchecked")
     static <T> Field<T> field(Object value, Field<T> field) {
@@ -91,18 +91,5 @@ class Tools {
     private static IllegalArgumentException fieldExpected(Object value) {
         return new IllegalArgumentException("Cannot interpret argument of type " + value.getClass() + " as a Field: " + value);
     }
-
-    /**
-     * A utility method that fails with an exception if
-     * {@link Row#indexOf(Field)} doesn't return any index.
-     */
-    static int indexOrFail(Row row, Field<?> field) {
-        int result = row.indexOf(field);
-
-        if (result < 0)
-            throw new IllegalArgumentException("Field (" + field + ") is not contained in Row " + row);
-
-        return result;
-    }
-
+    
 }
