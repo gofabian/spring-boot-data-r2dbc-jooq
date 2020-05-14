@@ -1,4 +1,4 @@
-package gofabian.db;
+package gofabian.example;
 
 import org.jooq.*;
 import org.jooq.impl.UpdatableRecordImpl;

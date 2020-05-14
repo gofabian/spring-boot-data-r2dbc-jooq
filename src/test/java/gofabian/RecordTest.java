@@ -1,8 +1,8 @@
 package gofabian;
 
-import gofabian.db.BookPojo;
-import gofabian.db.BookRecord;
-import gofabian.db.BookTable;
+import gofabian.example.BookPojo;
+import gofabian.example.BookRecord;
+import gofabian.example.BookTable;
 import gofabian.r2dbc.jooq.ReactiveJooq;
 import org.jooq.*;
 import org.jooq.impl.DSL;
@@ -20,11 +20,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-// todo: run this once for every db type -> JUnit 5 extension?
 @SpringBootTest
-//@SpringBootTest(properties = "spring.r2dbc.url=r2dbc:tc:postgresql:///db?TC_IMAGE_TAG=9.6.8")
-//@SpringBootTest(properties = "spring.r2dbc.url=r2dbc:tc:mysql:///db?TC_IMAGE_TAG=5.6.23")
-class RecordTest {
+public class RecordTest {
 
     @Autowired
     DatabaseClient databaseClient;

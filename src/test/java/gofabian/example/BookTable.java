@@ -1,4 +1,4 @@
-package gofabian.db;
+package gofabian.example;
 
 import org.jooq.Identity;
 import org.jooq.TableField;

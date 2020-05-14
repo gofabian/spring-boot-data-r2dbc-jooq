@@ -1,4 +1,4 @@
-package gofabian.db;
+package gofabian.example;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
