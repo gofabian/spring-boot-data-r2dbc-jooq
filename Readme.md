@@ -2,6 +2,7 @@
 # Reactive JOOQ - an R2DBC adapter for Spring Boot
 
 ![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/gofabian/spring-boot-data-r2dbc-jooq)
+![tests](https://github.com/gofabian/spring-boot-data-r2dbc-jooq/workflows/tests/badge.svg)
 
 This library integrates JOOQ into Spring Data R2DBC.
 
