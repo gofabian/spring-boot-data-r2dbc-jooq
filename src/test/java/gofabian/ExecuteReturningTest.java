@@ -11,7 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.r2dbc.core.DatabaseClient;
+import org.springframework.r2dbc.core.DatabaseClient;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,13 +33,13 @@ public class ExecuteReturningTest {
                 .column(DSL.field(DSL.name("name"), String.class), SQLDataType.VARCHAR)
                 .column(DSL.field(DSL.name("timestamp"), LocalDateTime.class), SQLDataType.LOCALDATETIME.defaultValue(DSL.currentLocalDateTime()))
                 .constraint(DSL.constraint("pk_id").primaryKey(DSL.name("id")));
-        databaseClient.execute(query.getSQL()).fetch().rowsUpdated().block();
+        databaseClient.sql(query.getSQL()).fetch().rowsUpdated().block();
     }
 
     @AfterEach
     void after() {
         Query query = dslContext.dropTable(DSL.name("book"));
-        databaseClient.execute(query.getSQL()).fetch().rowsUpdated().block();
+        databaseClient.sql(query.getSQL()).fetch().rowsUpdated().block();
     }
 
     @Test

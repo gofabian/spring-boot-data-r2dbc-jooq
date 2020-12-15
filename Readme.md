@@ -48,7 +48,7 @@ Add this library and a database driver (e. g. h2) to your `pom.xml`:
 <dependency>
     <groupId>io.r2dbc</groupId>
     <artifactId>r2dbc-h2</artifactId>
-    <version>0.8.3.RELEASE</version>
+    <version>0.8.4.RELEASE</version>
 </dependency>
 ```
 
@@ -85,8 +85,8 @@ public class ReactiveBookService {
 
 ## Support
 
-- Spring Boot 2.3.0.M4
-- H2, MySQL, Postgresql
+- Spring Boot 2.4
+- H2, MySQL, PostgreSQL
 - Java 8+
 - Spring @Transactional annotation
 

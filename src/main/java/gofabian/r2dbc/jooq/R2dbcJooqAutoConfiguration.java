@@ -6,8 +6,8 @@ import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.r2dbc.core.DatabaseClient;
 import org.springframework.data.r2dbc.dialect.*;
+import org.springframework.r2dbc.core.DatabaseClient;
 
 @Configuration
 public class R2dbcJooqAutoConfiguration {

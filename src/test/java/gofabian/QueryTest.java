@@ -12,7 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.r2dbc.core.DatabaseClient;
+import org.springframework.r2dbc.core.DatabaseClient;
 
 import java.util.List;
 
@@ -36,20 +36,20 @@ public class QueryTest {
                     .column(field(name("id"), Long.class), SQLDataType.BIGINT.identity(true))
                     .column(field(name("name"), String.class), SQLDataType.VARCHAR)
                     .constraint(constraint(name("pk_id2")).primaryKey(name("id")));
-            databaseClient.execute(query.getSQL()).fetch().rowsUpdated().block();
+            databaseClient.sql(query.getSQL()).fetch().rowsUpdated().block();
         }
         {
             Query query = dslContext.insertInto(table(name("tab")),
                     field(name("name"), String.class))
                     .values("fab");
-            databaseClient.execute(query.getSQL(ParamType.INLINED)).fetch().rowsUpdated().block();
+            databaseClient.sql(query.getSQL(ParamType.INLINED)).fetch().rowsUpdated().block();
         }
     }
 
     @AfterEach
     void after() {
         Query query = dslContext.dropTable(name("tab"));
-        databaseClient.execute(query.getSQL()).fetch().rowsUpdated().block();
+        databaseClient.sql(query.getSQL()).fetch().rowsUpdated().block();
     }
 
     @Test

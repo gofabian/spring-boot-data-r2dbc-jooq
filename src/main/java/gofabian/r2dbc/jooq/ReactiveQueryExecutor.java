@@ -3,7 +3,7 @@ package gofabian.r2dbc.jooq;
 import io.r2dbc.spi.Row;
 import org.jooq.*;
 import org.jooq.conf.ParamType;
-import org.springframework.data.r2dbc.core.DatabaseClient;
+import org.springframework.r2dbc.core.DatabaseClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -207,7 +207,7 @@ public class ReactiveQueryExecutor {
      */
     private DatabaseClient.GenericExecuteSpec createR2dbcExecuteSpec(Query jooqQuery) {
         String sql = jooqQuery.getSQL(ParamType.NAMED);
-        DatabaseClient.GenericExecuteSpec executeSpec = databaseClient.execute(sql);
+        DatabaseClient.GenericExecuteSpec executeSpec = databaseClient.sql(sql);
 
         List<Param<?>> parameters = jooqQuery.getParams().values().stream()
                 .filter(p -> p.getParamType() != ParamType.INLINED).collect(Collectors.toList());

@@ -4,7 +4,7 @@ import org.jooq.*;
 import org.jooq.conf.Settings;
 import org.jooq.exception.NoDataFoundException;
 import org.jooq.tools.JooqLogger;
-import org.springframework.data.r2dbc.core.DatabaseClient;
+import org.springframework.r2dbc.core.DatabaseClient;
 import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
