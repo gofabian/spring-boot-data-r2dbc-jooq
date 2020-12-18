@@ -2,6 +2,7 @@ package gofabian.r2dbc.jooq;
 
 import gofabian.r2dbc.jooq.converter.CompositeConverter;
 import gofabian.r2dbc.jooq.converter.Converter;
+import gofabian.r2dbc.jooq.converter.JsonConverter;
 import io.r2dbc.spi.ConnectionFactory;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
@@ -12,6 +13,9 @@ import org.springframework.data.r2dbc.dialect.*;
 import org.springframework.r2dbc.core.DatabaseClient;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 public class R2dbcJooqAutoConfiguration {
@@ -40,14 +44,16 @@ public class R2dbcJooqAutoConfiguration {
     }
 
     private Converter getConverter(SQLDialect sqlDialect) {
-        switch (sqlDialect) {
-            case POSTGRES:
-                return createConverter("gofabian.r2dbc.jooq.converter.PostgresConverter");
-            case MYSQL:
-            case H2:
-            default:
-                return new CompositeConverter(new Converter[0]);
+        List<Converter> converters = new ArrayList<>();
+        converters.add(new JsonConverter());
+
+        if (sqlDialect == SQLDialect.POSTGRES) {
+            Converter converter = createConverter("gofabian.r2dbc.jooq.converter.PostgresConverter");
+            converters.add(converter);
         }
+
+        Converter[] array = converters.toArray(new Converter[0]);
+        return new CompositeConverter(array);
     }
 
     private Converter createConverter(String className) {

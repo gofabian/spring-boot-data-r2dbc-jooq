@@ -9,7 +9,7 @@ import org.springframework.test.context.TestPropertySource;
 
 public class MySqlTest {
 
-    static final String R2DBC_URL_PROPERTY = "spring.r2dbc.url=r2dbc:tc:mysql:///db?TC_IMAGE_TAG=8.0";
+    public static final String R2DBC_URL_PROPERTY = "spring.r2dbc.url=r2dbc:tc:mysql:///db?TC_IMAGE_TAG=8.0";
 
     @Nested
     @TestPropertySource(properties = MySqlTest.R2DBC_URL_PROPERTY)

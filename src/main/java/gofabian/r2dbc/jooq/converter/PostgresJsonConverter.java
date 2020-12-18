@@ -1,22 +1,25 @@
 package gofabian.r2dbc.jooq.converter;
 
 import io.r2dbc.postgresql.codec.Json;
-import org.jooq.JSON;
 
-public class PostgresJsonConverter extends AbstractConverter<JSON, Json> {
+public class PostgresJsonConverter implements Converter {
 
-    public PostgresJsonConverter() {
-        super(JSON.class, Json.class);
+    @Override
+    public Object toJooqValue(Object r2dbcValue, Class<?> targetJooqType) {
+        if (r2dbcValue instanceof Json) {
+            return ((Json) r2dbcValue).asString();
+        }
+        return r2dbcValue;
     }
 
     @Override
-    protected JSON toTypedJooqValue(Json r2dbcValue) {
-        return JSON.valueOf(r2dbcValue.asString());
+    public Object toR2dbcValue(Object jooqValue) {
+        return jooqValue;
     }
 
     @Override
-    protected Json toTypedR2dbcValue(JSON jooqValue) {
-        return Json.of(jooqValue.data());
+    final public Class<?> toR2dbcType(Class<?> sourceJooqType) {
+        return sourceJooqType;
     }
 
 }
