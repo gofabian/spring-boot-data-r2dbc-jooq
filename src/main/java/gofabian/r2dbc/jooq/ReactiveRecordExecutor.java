@@ -1,5 +1,6 @@
 package gofabian.r2dbc.jooq;
 
+import gofabian.r2dbc.jooq.converter.Converter;
 import org.jooq.*;
 import org.jooq.conf.Settings;
 import org.jooq.exception.NoDataFoundException;
@@ -22,9 +23,9 @@ public class ReactiveRecordExecutor {
     private final DSLContext dslContext;
     private final ReactiveQueryExecutor reactiveQueryExecutor;
 
-    public ReactiveRecordExecutor(DSLContext dslContext, DatabaseClient databaseClient) {
+    public ReactiveRecordExecutor(DSLContext dslContext, DatabaseClient databaseClient, Converter converter) {
         this.dslContext = Objects.requireNonNull(dslContext);
-        this.reactiveQueryExecutor = new ReactiveQueryExecutor(dslContext, databaseClient);
+        this.reactiveQueryExecutor = new ReactiveQueryExecutor(dslContext, databaseClient, converter);
     }
 
     public static ReactiveRecordExecutor from(Attachable attachable) {
@@ -34,7 +35,8 @@ public class ReactiveRecordExecutor {
     public static ReactiveRecordExecutor from(DSLContext dslContext) {
         Configuration configuration = dslContext.configuration();
         DatabaseClient databaseClient = (DatabaseClient) configuration.data("databaseClient");
-        return new ReactiveRecordExecutor(dslContext, databaseClient);
+        Converter converter = (Converter) configuration.data("converter");
+        return new ReactiveRecordExecutor(dslContext, databaseClient, converter);
     }
 
     @Support

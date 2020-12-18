@@ -1,5 +1,6 @@
 package gofabian.r2dbc.jooq;
 
+import gofabian.r2dbc.jooq.converter.Converter;
 import io.r2dbc.spi.Row;
 import org.jooq.*;
 import org.jooq.conf.ParamType;
@@ -19,10 +20,14 @@ public class ReactiveQueryExecutor {
 
     private final DSLContext dslContext;
     private final DatabaseClient databaseClient;
+    private final Converter converter;
+    private final RowConverter rowConverter;
 
-    public ReactiveQueryExecutor(DSLContext dslContext, DatabaseClient databaseClient) {
+    public ReactiveQueryExecutor(DSLContext dslContext, DatabaseClient databaseClient, Converter converter) {
         this.dslContext = Objects.requireNonNull(dslContext);
         this.databaseClient = Objects.requireNonNull(databaseClient);
+        this.converter = Objects.requireNonNull(converter);
+        this.rowConverter = new RowConverter(converter);
     }
 
     public static ReactiveQueryExecutor from(Attachable attachable) {
@@ -32,7 +37,8 @@ public class ReactiveQueryExecutor {
     public static ReactiveQueryExecutor from(DSLContext dslContext) {
         Configuration configuration = dslContext.configuration();
         DatabaseClient databaseClient = (DatabaseClient) configuration.data("databaseClient");
-        return new ReactiveQueryExecutor(dslContext, databaseClient);
+        Converter converter = (Converter) configuration.data("converter");
+        return new ReactiveQueryExecutor(dslContext, databaseClient, converter);
     }
 
 
@@ -91,7 +97,7 @@ public class ReactiveQueryExecutor {
     private <R extends Record> R convertSelectedRowToRecord(Row row, Select<R> jooqQuery) {
         List<Field<?>> allFields = jooqQuery.getSelect();
         Class<? extends R> recordType = jooqQuery.getRecordType();
-        return RowConverter.convertRowToRecord(dslContext, row, allFields, recordType);
+        return rowConverter.convertRowToRecord(dslContext, row, allFields, recordType);
     }
 
     @Support
@@ -197,7 +203,7 @@ public class ReactiveQueryExecutor {
             case POSTGRES:
             default:
                 return executeSpec
-                        .map(row -> RowConverter.convertRowToRecord(dslContext, row, returningResolvedFields, recordType))
+                        .map(row -> rowConverter.convertRowToRecord(dslContext, row, returningResolvedFields, recordType))
                         .all();
         }
     }
@@ -214,9 +220,13 @@ public class ReactiveQueryExecutor {
         for (int i = 0; i < parameters.size(); i++) {
             Param<?> parameter = parameters.get(i);
             Object bindValue = parameter.getValue();
+            Class<?> bindType = parameter.getType();
+
             if (bindValue == null) {
-                executeSpec = executeSpec.bindNull(i, parameter.getType());
+                bindType = converter.toR2dbcType(bindType);
+                executeSpec = executeSpec.bindNull(i, bindType);
             } else {
+                bindValue = converter.toR2dbcValue(bindValue);
                 executeSpec = executeSpec.bind(i, bindValue);
             }
         }
