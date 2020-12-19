@@ -148,9 +148,35 @@ Further unsupported features:
 
 ## Release process
 
-(0) Signing key must be available
+(0) Prerequisites:
+
+Signing key must be available:
 
     $ gpg --list-keys
+
+OSSRH credentials must be available:
+
+    $ cat ~/.m2/settings.xml
+    <settings>
+      <servers>
+        <server>
+          <id>ossrh</id>
+          <username>your-jira-id</username>
+          <password>your-jira-pwd</password>
+        </server>
+      </servers>
+      <profiles>
+        <profile>
+          <activation>
+            <activeByDefault>true</activeByDefault>
+          </activation>
+          <properties>
+            <gpg.keyname>your-keyname</gpg.keyname>
+          </properties>
+        </profile>
+      <profiles>
+    </settings>
+
 
 (1) Manuel steps to prepare release, e. g. update version in Readme file
 
