@@ -146,6 +146,29 @@ Further unsupported features:
 - ...
 
 
+## JOOQ/R2DBC type converters
+
+JOOQ and the R2DBC drivers have built-in support for specific SQL data types. For example: JOOQ 
+puts `JSON` data into an instance of `org.jooq.JSON`, the r2dbc-postgresql driver has an own 
+wrapper `io.r2dbc.postgresql.codec.Json`. That means we need a converter for the `JSON <-> Json` 
+conversion.
+
+The default converter supports the `JSON` conversion for MySQL and PostgreSQL and can be found at:
+
+```java
+    dslContext.configuration().data("converter")
+```
+
+You can override this value if you want to add custom converters:
+
+```java
+    Converter myConverter = ...    
+
+    Converter converter = (Converter) dslContext.configuration().data("converter");
+    converter = new CompositeConverter(new Converter[]{converter, myConverter});
+    dslContext.configuration().data("converter", converter);
+```
+
 ## Release process
 
 (0) Prerequisites:
@@ -178,7 +201,7 @@ OSSRH credentials must be available:
     </settings>
 
 
-(1) Manuel steps to prepare release, e. g. update version in Readme file
+(1) Manual steps to prepare release, e. g. update version in Readme file
 
     $ nano Readme.md
     $ git add . && git commit -m 'Bump version'
