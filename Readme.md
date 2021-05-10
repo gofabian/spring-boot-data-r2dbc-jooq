@@ -112,7 +112,7 @@ public class ReactiveBookService {
 
 ## Restrictions
 
-The auto-configured DSLContext does not have a JDBC connection. It is only intended to generate SQL strings which is 
+The auto-configured DSLContext does not have a JDBC connection. It is only intended to generate SQL strings which are 
 given to the R2DBC database client for execution.
 
 Do not use JOOQ methods that require a JDBC connection (every method that calls the database)! Use the `ReactiveJooq` 
